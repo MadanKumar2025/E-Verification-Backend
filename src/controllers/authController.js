@@ -1,8 +1,9 @@
 import User from "../models/User.js";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import bcrypt from "bcrypt";
+
 dotenv.config();
-import nodemailer from "nodemailer";
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_key";
 
@@ -10,6 +11,7 @@ export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Check email
     const user = await User.findOne({ email });
 
     if (!user) {
@@ -19,13 +21,20 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    if (user.password !== password) {
+    // Check password using bcrypt
+    const isPasswordValid = await bcrypt.compare(
+      password,
+      user.password
+    );
+
+    if (!isPasswordValid) {
       return res.status(400).json({
         success: false,
         message: "Invalid password",
       });
     }
 
+    // Check active status
     if (!user.isActive) {
       return res.status(403).json({
         success: false,
@@ -39,15 +48,27 @@ export const loginUser = async (req, res) => {
       name: user.name,
     };
 
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "1d" });
+    const token = jwt.sign(payload, JWT_SECRET, {
+      expiresIn: "1d",
+    });
 
     res.status(200).json({
       success: true,
       message: "Login successful",
       token,
-      data: user,
+      data: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        mobileNo: user.mobileNo,
+        photo: user.photo,
+        isActive: user.isActive,
+      },
     });
+
   } catch (error) {
+    console.log(error);
+
     res.status(500).json({
       success: false,
       message: error.message,

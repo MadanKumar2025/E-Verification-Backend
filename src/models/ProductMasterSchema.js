@@ -1,29 +1,30 @@
 import mongoose from "mongoose";
 
-const userSchema = new mongoose.Schema({
-  name: {
+const productMasterSchema = new mongoose.Schema({
+  productName: {
     type: String,
     required: true,
   },
 
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-  },
-
-  password: {
+  productCode: {
     type: String,
     required: true,
   },
 
-  mobileNo: {
-    type: String,
-    match: [/^[0-9]{10}$/, "Mobile number must be exactly 10 digits"],
+  productActualPrice: {
+    type: Number,
+    required: true,
   },
 
-  photo: {
-    type: String,
+  productSellingPrice: {
+    type: Number,
+    required: true,
+  },
+
+  companyID: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Company",
+    required: true,
   },
 
   isActive: {
@@ -50,5 +51,8 @@ const userSchema = new mongoose.Schema({
     type: Date,
   },
 });
-
-export default mongoose.model("User", userSchema);
+productMasterSchema.index(
+  { companyID: 1, productCode: 1 },
+  { unique: true }
+);
+export default mongoose.model("ProductMaster", productMasterSchema);

@@ -1,29 +1,57 @@
 import mongoose from "mongoose";
 
-const userSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-  },
-
-  email: {
+const companySchema = new mongoose.Schema({
+  companyName: {
     type: String,
     required: true,
     unique: true,
   },
 
-  password: {
+  gstNo: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+
+  address1: {
     type: String,
     required: true,
   },
 
-  mobileNo: {
+  address2: {
     type: String,
-    match: [/^[0-9]{10}$/, "Mobile number must be exactly 10 digits"],
   },
 
-  photo: {
+  city: {
     type: String,
+    required: true,
+  },
+
+  state: {
+    type: String,
+    required: true,
+  },
+
+  country: {
+    type: String,
+    default: "India",
+  },
+
+  key: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+
+  secret: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+
+  EndDate: {
+    type: Date,
+    required: true,
   },
 
   isActive: {
@@ -51,4 +79,4 @@ const userSchema = new mongoose.Schema({
   },
 });
 
-export default mongoose.model("User", userSchema);
+export default mongoose.model("Company", companySchema);
