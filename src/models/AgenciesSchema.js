@@ -1,56 +1,70 @@
 import mongoose from "mongoose";
 
-const companySchema = new mongoose.Schema({
-  companyName: {
+const agencySchema = new mongoose.Schema({
+  agencyName: {
     type: String,
     required: true,
-    unique: true,
+    trim: true,
   },
 
   gstNo: {
     type: String,
-    required: true,
     unique: true,
+    uppercase: true,
+    trim: true,
+    match: [
+      /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
+      "Invalid GST Number",
+    ],
   },
 
-  address1: {
+  address: {
     type: String,
     required: true,
-  },
-
-  address2: {
-    type: String,
+    trim: true,
   },
 
   city: {
     type: String,
     required: true,
+    trim: true,
   },
 
   state: {
     type: String,
     required: true,
+    trim: true,
   },
 
   country: {
     type: String,
     default: "India",
+    trim: true,
   },
 
-  key: {
+  tan: {
+    type: String,
+    unique: true,
+    uppercase: true,
+    trim: true,
+  },
+
+  email: {
     type: String,
     required: true,
     unique: true,
+    lowercase: true,
+    trim: true,
   },
 
-  secret: {
+  mobile: {
     type: String,
     required: true,
-    unique: true,
+    match: [/^[0-9]{10}$/, "Mobile number must be exactly 10 digits"],
   },
 
-  EndDate: {
-    type: Date,
+  subscriptionId: {
+    type: String,
     required: true,
   },
 
@@ -59,24 +73,24 @@ const companySchema = new mongoose.Schema({
     default: true,
   },
 
-  createdate: {
+  createdDate: {
     type: Date,
     default: Date.now,
   },
 
-  createby: {
+  createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
   },
 
-  updateby: {
+  updatedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
   },
 
-  updatedate: {
+  updatedDate: {
     type: Date,
   },
 });
 
-export default mongoose.model("Company", companySchema);
+export default mongoose.model("Agency", agencySchema);

@@ -22,17 +22,18 @@ export const loginUser = async (req, res) => {
     }
 
     // Check password using bcrypt
-    const isPasswordValid = await bcrypt.compare(
-      password,
-      user.password
-    );
+    // const isPasswordValid = await bcrypt.compare(
+    //   password,
+    //   user.password
+    // );
 
-    if (!isPasswordValid) {
+    if (!password || password !== user.password) {
       return res.status(400).json({
         success: false,
         message: "Invalid password",
       });
     }
+     
 
     // Check active status
     if (!user.isActive) {
@@ -65,7 +66,6 @@ export const loginUser = async (req, res) => {
         isActive: user.isActive,
       },
     });
-
   } catch (error) {
     console.log(error);
 
@@ -76,10 +76,8 @@ export const loginUser = async (req, res) => {
   }
 };
 
-
 export const forgotPassword = async (req, res) => {
   try {
-
     const { email } = req.body;
 
     const user = await User.findOne({ email });
@@ -116,13 +114,10 @@ export const forgotPassword = async (req, res) => {
       success: true,
       message: "Password sent successfully.",
     });
-
   } catch (error) {
-
     res.status(500).json({
       success: false,
       message: error.message,
     });
-
   }
 };

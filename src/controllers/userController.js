@@ -1,7 +1,6 @@
 import User from "../models/User.js";
 import fs from "fs";
 import path from "path";
-import bcrypt from "bcrypt";
 import mongoose from "mongoose";
 
 export const createUser = async (req, res) => {
@@ -57,11 +56,8 @@ export const createUser = async (req, res) => {
       });
     }
 
-    // Photo
-    const photo = req.file ? req.file.filename : "";
-
     // Password Hash
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // const hashedPassword = await bcrypt.hash(password, 10);
 
     // Logged in User Id
     const createby = req.user?.id || null;
@@ -69,9 +65,8 @@ export const createUser = async (req, res) => {
     const user = new User({
       name,
       email,
-      password: hashedPassword,
+      password,
       mobileNo,
-      photo,
       createby,
     });
 
@@ -113,7 +108,6 @@ export const getUsers = async (req, res) => {
       name: user.name,
       email: user.email,
       mobileNo: user.mobileNo,
-      photo: user.photo,
       isActive: user.isActive,
 
       createby: user.createby,
@@ -165,7 +159,6 @@ export const getUserById = async (req, res) => {
       name: user.name,
       email: user.email,
       mobileNo: user.mobileNo,
-      photo: user.photo,
       isActive: user.isActive,
       createby: user.createby,
       updateby: user.updateby,
@@ -237,27 +230,12 @@ export const updateUser = async (req, res) => {
 
     // Password Update
     if (password !== undefined && password !== "") {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      user.password = hashedPassword;
+      user.password = password;
     }
 
     // Active Status Update
     if (isActive !== undefined) {
       user.isActive = isActive === true || isActive === "true";
-    }
-
-    // Photo Update
-    if (req.file) {
-      // Delete Old Photo
-      if (user.photo) {
-        const oldImagePath = path.join(process.cwd(), "uploads", user.photo);
-
-        if (fs.existsSync(oldImagePath)) {
-          fs.unlinkSync(oldImagePath);
-        }
-      }
-
-      user.photo = req.file.filename;
     }
 
     // Audit Fields
@@ -307,7 +285,7 @@ export const updateUserStatus = async (req, res) => {
         updateby: req.user?.id || null,
         updatedate: new Date(),
       },
-      { new: true }
+      { new: true },
     );
 
     if (!user) {
@@ -322,7 +300,6 @@ export const updateUserStatus = async (req, res) => {
       message: "User status updated successfully",
       data: user,
     });
-
   } catch (error) {
     console.error("Update User Status Error =>", error);
 
