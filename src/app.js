@@ -8,6 +8,8 @@ import ScreenReaderAccessRoutes from "./routes/ScreenReaderAccessRoutes.js";
 import ApiFunctionMappingRoutes from "./routes/ApiFunctionMappingRoutes.js";
 
 import Agencies from "./routes/AgenciesRoutes.js";
+import SubscriptionPlan from "./routes/SubscriptionPlanRoutes.js";
+import ProfileManager  from "./routes/ProfileManagerRoutes.js";
 
 import cors from "cors";
 import path from "path";
@@ -33,6 +35,8 @@ app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.use("/api", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/Agencies", Agencies);
+app.use("/api/SubscriptionPlan", SubscriptionPlan);
+app.use("/api/ProfileManager", ProfileManager);
 
 app.use("/api/AdminMenuMasterRoutes", AdminMenuMasterRoutes);
 app.use("/api/UserPermissionsRoutes", UserPermissionsRoutes);

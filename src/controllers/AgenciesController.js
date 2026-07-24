@@ -1,5 +1,6 @@
 import Agency from "../models/AgenciesSchema.js";
 import User from "../models/User.js";
+import Subscription from "../models/SubscriptionPlanSchema.js";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 import mongoose from "mongoose";
@@ -57,6 +58,22 @@ export const createAgency = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Subscription is required",
+      });
+    }
+
+    const subscription = await Subscription.findById(subscriptionId);
+
+    if (!subscription) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Subscription",
+      });
+    }
+
+    if (!subscription.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: "Subscription is not active",
       });
     }
 
@@ -149,15 +166,13 @@ export const createAgency = async (req, res) => {
     }
     const createdBy = req.user?.id || null;
 
-    // Hash Password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
     // Create User
     const user = await User.create({
       name: agencyName,
       email,
-      password: hashedPassword,
+      password: password,
       mobileNo: mobile,
+      UserRole: "Agency",
       createby: createdBy,
     });
 
@@ -479,6 +494,29 @@ export const updateAgency = async (req, res) => {
 
     // Subscription
     if (subscriptionId !== undefined) {
+      if (!mongoose.Types.ObjectId.isValid(subscriptionId)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid Subscription Id",
+        });
+      }
+
+      const subscription = await Subscription.findById(subscriptionId);
+
+      if (!subscription) {
+        return res.status(400).json({
+          success: false,
+          message: "Subscription not found",
+        });
+      }
+
+      if (!subscription.isActive) {
+        return res.status(400).json({
+          success: false,
+          message: "Subscription is inactive",
+        });
+      }
+
       agency.subscriptionId = subscriptionId;
     }
 
