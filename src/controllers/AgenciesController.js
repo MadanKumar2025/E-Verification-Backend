@@ -21,7 +21,7 @@ export const createAgency = async (req, res) => {
       password,
     } = req.body;
 
-    // Agency Name Validation
+    // Agency Validation
     if (!agencyName || agencyName.trim() === "") {
       return res.status(400).json({
         success: false,
@@ -29,7 +29,6 @@ export const createAgency = async (req, res) => {
       });
     }
 
-    // Address Validation
     if (!address || address.trim() === "") {
       return res.status(400).json({
         success: false,
@@ -37,7 +36,6 @@ export const createAgency = async (req, res) => {
       });
     }
 
-    // City Validation
     if (!city || city.trim() === "") {
       return res.status(400).json({
         success: false,
@@ -45,7 +43,6 @@ export const createAgency = async (req, res) => {
       });
     }
 
-    // State Validation
     if (!state || state.trim() === "") {
       return res.status(400).json({
         success: false,
@@ -110,18 +107,8 @@ export const createAgency = async (req, res) => {
       });
     }
 
-    // GST Validation
-    if (
-      gstNo &&
-      !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstNo)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid GST Number",
-      });
-    }
+    // Duplicate Email Check
 
-    // Check Agency Email
     const agencyEmail = await Agency.findOne({ email });
 
     if (agencyEmail) {
@@ -131,7 +118,6 @@ export const createAgency = async (req, res) => {
       });
     }
 
-    // Check User Email
     const userEmail = await User.findOne({ email });
 
     if (userEmail) {
@@ -141,10 +127,10 @@ export const createAgency = async (req, res) => {
       });
     }
 
-    // GST Duplicate
+    // GST Duplicate Check
+
     if (gstNo) {
       const gstExists = await Agency.findOne({ gstNo });
-
       if (gstExists) {
         return res.status(400).json({
           success: false,
@@ -153,10 +139,9 @@ export const createAgency = async (req, res) => {
       }
     }
 
-    // TAN Duplicate
+    // TAN Duplicate Check
     if (tan) {
       const tanExists = await Agency.findOne({ tan });
-
       if (tanExists) {
         return res.status(400).json({
           success: false,
@@ -164,19 +149,11 @@ export const createAgency = async (req, res) => {
         });
       }
     }
+
     const createdBy = req.user?.id || null;
 
-    // Create User
-    const user = await User.create({
-      name: agencyName,
-      email,
-      password: password,
-      mobileNo: mobile,
-      UserRole: "Agency",
-      createby: createdBy,
-    });
+    // CREATE AGENCY FIRST
 
-    // Create Agency
     const agency = await Agency.create({
       agencyName,
       gstNo,
@@ -188,19 +165,25 @@ export const createAgency = async (req, res) => {
       email,
       mobile,
       subscriptionId,
+      // Subscription se credits lena
+      credits: subscription.credits,
       createdBy,
     });
 
-    console.log("gmail", email);
+    // CREATE USER WITH AGENCY ID
 
-    // Send Email
-    // const transporter = nodemailer.createTransport({
-    //   service: "gmail",
-    //   auth: {
-    //     user: process.env.EMAIL_USER,
-    //     pass: process.env.EMAIL_PASS,
-    //   },
-    // });
+    const user = await User.create({
+      name: agencyName,
+      email,
+      password,
+      mobileNo: mobile,
+      UserRole: "Agency",
+      // Agency ID save hogi
+      refid: agency._id,
+      createby: createdBy,
+    });
+
+    // SEND EMAIL
 
     const transporter = nodemailer.createTransport({
       service: "gmail",
@@ -215,42 +198,39 @@ export const createAgency = async (req, res) => {
 
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
+
       to: email,
+
       subject: "Agency Account Created Successfully",
+
       html: `
-        <h2>Hello ${agencyName},</h2>
 
-        <p>Your Agency account has been created successfully.</p>
+      <h2>Hello ${agencyName}</h2>
 
-        <table border="1" cellpadding="8" cellspacing="0">
-          <tr>
-            <td><b>Agency Name</b></td>
-            <td>${agencyName}</td>
-          </tr>
-          <tr>
-            <td><b>Email</b></td>
-            <td>${email}</td>
-          </tr>
-          <tr>
-            <td><b>Password</b></td>
-            <td>${password}</td>
-          </tr>
-        </table>
+      <p>Your Agency account has been created successfully.</p>
 
-        <br>
+      <table border="1" cellpadding="8">
 
-        <p>Please login using the above credentials and change your password after first login.</p>
+      <tr>
+      <td><b>Email</b></td>
+      <td>${email}</td>
+      </tr>
 
-        <br>
 
-        <b>Thank You</b>
+      <tr>
+      <td><b>Password</b></td>
+      <td>${password}</td>
+      </tr>
+
+      </table>
+
+      <p>Please change your password after first login.</p>
       `,
     });
 
     return res.status(201).json({
       success: true,
-      message:
-        "Agency created successfully and login credentials sent to email.",
+      message: "Agency created successfully",
       data: {
         agency,
         user,
@@ -258,7 +238,6 @@ export const createAgency = async (req, res) => {
     });
   } catch (error) {
     console.log(error);
-
     if (error.name === "ValidationError") {
       const errors = Object.values(error.errors).map((err) => err.message);
 

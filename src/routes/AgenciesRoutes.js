@@ -13,6 +13,7 @@ const router = express.Router();
 
 router.post("/", authMiddleware, createAgency);
 router.get("/", authMiddleware, getAgencies);
+
 router.get("/:id", authMiddleware, getAgencyById);
 router.put("/update/:id", authMiddleware, updateAgency);
 

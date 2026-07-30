@@ -6,10 +6,13 @@ import AdminMenuMasterRoutes from "./routes/AdminMenuMasterRoutes.js";
 import UserPermissionsRoutes from "./routes/UserPermissionsRoutes.js";
 import ScreenReaderAccessRoutes from "./routes/ScreenReaderAccessRoutes.js";
 import ApiFunctionMappingRoutes from "./routes/ApiFunctionMappingRoutes.js";
+import MasterEmployer from "./routes/MasterEmployerRoutes.js";
 
 import Agencies from "./routes/AgenciesRoutes.js";
 import SubscriptionPlan from "./routes/SubscriptionPlanRoutes.js";
 import ProfileManager  from "./routes/ProfileManagerRoutes.js";
+import EducationVerificationLog  from "./routes/EducationVerificationLogRoutes.js";
+import EmploymentVerificationLogRoutes  from "./routes/EmploymentVerificationLogRoutes.js";
 
 import cors from "cors";
 import path from "path";
@@ -37,6 +40,9 @@ app.use("/api/auth", authRoutes);
 app.use("/api/Agencies", Agencies);
 app.use("/api/SubscriptionPlan", SubscriptionPlan);
 app.use("/api/ProfileManager", ProfileManager);
+app.use("/api/EducationVerificationLog", EducationVerificationLog);
+app.use("/api/MasterEmployer", MasterEmployer);
+app.use("/api/EmploymentVerificationLog", EmploymentVerificationLogRoutes);
 
 app.use("/api/AdminMenuMasterRoutes", AdminMenuMasterRoutes);
 app.use("/api/UserPermissionsRoutes", UserPermissionsRoutes);

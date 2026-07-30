@@ -67,30 +67,25 @@ const profileManagerSchema = new mongoose.Schema({
     {
       educationName: {
         type: String,
-        required: true,
         trim: true,
       },
 
       board: {
         type: String,
-        required: true,
         trim: true,
       },
 
       year: {
         type: Number,
-        required: true,
       },
 
       marks: {
         type: String,
-        required: true,
         trim: true,
       },
 
       rollNumber: {
         type: String,
-        required: true,
         trim: true,
       },
     },
@@ -101,13 +96,14 @@ const profileManagerSchema = new mongoose.Schema({
     {
       employedName: {
         type: String,
-        required: true,
         trim: true,
       },
-
+      employerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "MasterEmployer",
+      },
       jobStartDate: {
         type: Date,
-        required: true,
       },
 
       jobEndDate: {
@@ -116,13 +112,11 @@ const profileManagerSchema = new mongoose.Schema({
 
       salary: {
         type: String, // CTC
-        required: true,
         trim: true,
       },
 
       jobAddress: {
         type: String,
-        required: true,
         trim: true,
       },
     },

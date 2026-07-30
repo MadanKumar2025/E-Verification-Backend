@@ -2,6 +2,7 @@ import User from "../models/User.js";
 import fs from "fs";
 import path from "path";
 import mongoose from "mongoose";
+import { sendEmail } from "./emailService.js";
 
 export const createUser = async (req, res) => {
   try {
@@ -306,6 +307,221 @@ export const updateUserStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message || "Something went wrong",
+    });
+  }
+};
+
+export const getUsersToken = async (req, res) => {
+  try {
+    // Login user ki ID token se milegi
+    const userId = req.user.id;
+
+    const usersList = await User.find({
+      _id: userId,
+    })
+      .sort({ createdate: -1 })
+      .populate("createby", "name email")
+      .populate("updateby", "name email")
+      .populate("refid", "agencyName email mobile credits");
+
+    const data = usersList.map((user) => ({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      mobileNo: user.mobileNo,
+      UserRole: user.UserRole,
+      refid: user.refid,
+      isActive: user.isActive,
+      createby: user.createby,
+      updateby: user.updateby,
+      createdate: user.createdate,
+      updatedate: user.updatedate,
+    }));
+
+    return res.status(200).json({
+      success: true,
+
+      count: data.length,
+
+      data,
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+
+      message: "Error fetching users",
+    });
+  }
+};
+
+// this is use for change user Password
+// export const changePassword = async (req, res) => {
+//   const { newPassword, confirmNewPassword } = req.body;
+
+//   try {
+//     const user = req.user;
+
+//     if (newPassword !== confirmNewPassword) {
+//       return res
+//         .status(400)
+//         .json({ message: "New password and confirm password do not match" });
+//     }
+
+//     user.password = newPassword;
+//     user.updatedate = new Date();
+//     await user.save();
+
+//     res.status(200).json({ message: "Password changed successfully" });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// };
+
+export const changePassword = async (req, res) => {
+  try {
+    const { newPassword, confirmNewPassword } = req.body;
+
+    const user = req.user;
+
+    // User Check
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized user",
+      });
+    }
+
+    // Password Required
+    if (!newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password is required",
+      });
+    }
+
+    // Confirm Password Required
+    if (!confirmNewPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Confirm password is required",
+      });
+    }
+
+    // Password Match
+    if (newPassword !== confirmNewPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password and confirm password do not match",
+      });
+    }
+
+    // Password Update
+
+    user.password = newPassword;
+    user.updatedate = new Date();
+
+    await user.save();
+
+    // Send Email Notification
+
+    await sendEmail({
+      to: user.email,
+
+      subject: "Password Changed Successfully",
+
+      html: `
+
+      <div style="font-family:Arial,sans-serif">
+
+        <h2 style="color:#0dcaf0">
+          Password Changed Successfully
+        </h2>
+
+
+        <p>
+          Hello <b>${user.name}</b>,
+        </p>
+
+
+        <p>
+          Your account password has been changed successfully.
+        </p>
+
+
+        <table border="1" cellpadding="10" cellspacing="0">
+
+          <tr>
+            <td>
+              <b>Email</b>
+            </td>
+
+            <td>
+              ${user.email}
+            </td>
+          </tr>
+   <tr>
+      <td>
+        <b>New Password</b>
+      </td>
+
+      <td>
+        ${newPassword}
+      </td>
+    </tr>
+
+
+
+          <tr>
+            <td>
+              <b>Date</b>
+            </td>
+
+            <td>
+              ${new Date().toLocaleString()}
+            </td>
+          </tr>
+
+        </table>
+
+
+        <br/>
+
+        <p>
+          If you did not perform this action,
+          please contact administrator immediately.
+        </p>
+
+
+      </div>
+
+      `,
+    });
+
+    return res.status(200).json({
+      success: true,
+
+      message: "Password changed successfully",
+    });
+  } catch (error) {
+    console.log(error);
+
+    if (error.name === "ValidationError") {
+      const errors = Object.values(error.errors).map((err) => err.message);
+
+      return res.status(400).json({
+        success: false,
+
+        message: errors.join(", "),
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+
+      message: "Internal Server Error",
     });
   }
 };

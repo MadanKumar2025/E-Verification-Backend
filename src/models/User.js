@@ -27,6 +27,11 @@ const userSchema = new mongoose.Schema({
     required: true,
   },
 
+  refid: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Agency",
+  },
+
   isActive: {
     type: Boolean,
     default: true,

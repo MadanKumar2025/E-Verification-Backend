@@ -62,7 +62,10 @@ const agencySchema = new mongoose.Schema({
     required: true,
     match: [/^[0-9]{10}$/, "Mobile number must be exactly 10 digits"],
   },
-
+  credits: {
+    type: Number,
+    default: 0,
+  },
   // subscriptionId: {
   //   type: String,
   //   required: true,

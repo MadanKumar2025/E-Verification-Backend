@@ -8,7 +8,6 @@ const adminMenuMasterSchema = new mongoose.Schema({
   },
   url: {
     type: String,
-    // required: true,
   },
   displayOrderNumber: {
     type: Number,
@@ -16,7 +15,6 @@ const adminMenuMasterSchema = new mongoose.Schema({
   },
   menuType: {
     type: String,
-    // required: true,
   },
   parentMenuId: {
     type: mongoose.Schema.Types.ObjectId,
