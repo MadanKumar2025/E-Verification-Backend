@@ -24,19 +24,48 @@ const masterEmployerSchema = new mongoose.Schema({
   gst: {
     type: String,
     unique: true,
+    sparse: true,
     uppercase: true,
     trim: true,
-    match: [
-      /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
-      "Invalid GST Number",
-    ],
+    validate: {
+      validator: function (value) {
+        // GST optional hai
+        if (value === undefined || value === null || value === "") {
+          return true;
+        }
+
+        // GST format validation
+        return /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(
+          value,
+        );
+      },
+
+      message: "Invalid GST Number",
+    },
   },
 
   pan: {
     type: String,
     uppercase: true,
     trim: true,
+    required: true,
     match: [/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Invalid PAN Number"],
+  },
+
+  panPdf: {
+    type: String,
+    trim: true,
+    required: true,
+  },
+
+  gstPdf: {
+    type: String,
+    trim: true,
+  },
+
+  companyRegistrationPdf: {
+    type: String,
+    trim: true,
   },
 
   address: {
@@ -87,6 +116,11 @@ const masterEmployerSchema = new mongoose.Schema({
       },
       message: "Credits are required when subscriptionId is provided",
     },
+  },
+
+  isApproved: {
+    type: Boolean,
+    default: false,
   },
 
   isActive: {

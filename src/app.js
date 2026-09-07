@@ -10,9 +10,12 @@ import MasterEmployer from "./routes/MasterEmployerRoutes.js";
 
 import Agencies from "./routes/AgenciesRoutes.js";
 import SubscriptionPlan from "./routes/SubscriptionPlanRoutes.js";
-import ProfileManager  from "./routes/ProfileManagerRoutes.js";
-import EducationVerificationLog  from "./routes/EducationVerificationLogRoutes.js";
-import EmploymentVerificationLogRoutes  from "./routes/EmploymentVerificationLogRoutes.js";
+import ProfileManager from "./routes/ProfileManagerRoutes.js";
+import EducationVerificationLog from "./routes/EducationVerificationLogRoutes.js";
+import EmploymentVerificationLogRoutes from "./routes/EmploymentVerificationLogRoutes.js";
+import BoardUniversityRoutes from "./routes/BoardUniversityRoutes.js";
+import CountingRoutes from "./routes/CountingRoutes.js";
+import partnersRoutes from "./routes/partnersRoutes.js";
 
 import cors from "cors";
 import path from "path";
@@ -43,6 +46,9 @@ app.use("/api/ProfileManager", ProfileManager);
 app.use("/api/EducationVerificationLog", EducationVerificationLog);
 app.use("/api/MasterEmployer", MasterEmployer);
 app.use("/api/EmploymentVerificationLog", EmploymentVerificationLogRoutes);
+app.use("/api/BoardUniversity", BoardUniversityRoutes);
+app.use("/api/CountingRoutes", CountingRoutes);
+app.use("/api/partners", partnersRoutes);
 
 app.use("/api/AdminMenuMasterRoutes", AdminMenuMasterRoutes);
 app.use("/api/UserPermissionsRoutes", UserPermissionsRoutes);

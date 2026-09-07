@@ -68,11 +68,19 @@ const profileManagerSchema = new mongoose.Schema({
       educationName: {
         type: String,
         trim: true,
+        required: true,
+      },
+
+      boardId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "BoardUniversity",
+        required: true,
       },
 
       board: {
         type: String,
         trim: true,
+        required: true,
       },
 
       year: {
@@ -88,6 +96,11 @@ const profileManagerSchema = new mongoose.Schema({
         type: String,
         trim: true,
       },
+      attachment: {
+        type: String,
+        trim: true,
+        required: true,
+      },
     },
   ],
 
@@ -97,10 +110,12 @@ const profileManagerSchema = new mongoose.Schema({
       employedName: {
         type: String,
         trim: true,
+        required: true,
       },
       employerId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "MasterEmployer",
+        required: true,
       },
       jobStartDate: {
         type: Date,
@@ -118,6 +133,22 @@ const profileManagerSchema = new mongoose.Schema({
       jobAddress: {
         type: String,
         trim: true,
+      },
+
+      designation: {
+        type: String,
+        trim: true,
+      },
+
+      employeeId: {
+        type: String,
+        trim: true,
+        
+      },
+      attachment: {
+        type: String,
+        trim: true,
+        required: true,
       },
     },
   ],

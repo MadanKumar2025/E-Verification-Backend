@@ -3,219 +3,14 @@ import nodemailer from "nodemailer";
 
 import ProfileManager from "../models/ProfileManagerSchema.js";
 import EmploymentVerificationLog from "../models/EmploymentVerificationLogSchema.js";
-import { deductAgencyCredits } from "./creditService.js";
+// import { deductAgencyCredits } from "./creditService.js";
+import { deductCredits } from "./creditService.js";
+
 import MasterEmployer from "../models/MasterEmployerSchema.js";
-
-// export const createEmploymentVerificationLog = async (req, res) => {
-//   try {
-//     const { profileId, employmentDetailsId } = req.body;
-
-//     // Profile Id Validation
-//     if (!profileId || !mongoose.Types.ObjectId.isValid(profileId)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Valid Profile Id is required",
-//       });
-//     }
-
-//     // Employment Details Id Validation
-//     if (
-//       !employmentDetailsId ||
-//       !mongoose.Types.ObjectId.isValid(employmentDetailsId)
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Valid Employment Details Id is required",
-//       });
-//     }
-
-//     // Login User
-//     const createdBy = req.user?.id;
-
-//     if (!createdBy) {
-//       return res.status(401).json({
-//         success: false,
-//         message: "User authentication required",
-//       });
-//     }
-
-//     // Agency Id
-//     const agencyId = req.user?.refid;
-
-//     if (!agencyId) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Agency not assigned to user",
-//       });
-//     }
-
-//     // Find Profile
-//     const profile = await ProfileManager.findById(profileId);
-
-//     if (!profile) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Profile not found",
-//       });
-//     }
-
-//     // Find Employment Details
-//     const employment = profile.employmentDetails.id(employmentDetailsId);
-
-//     if (!employment) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Employment record not found",
-//       });
-//     }
-
-//     // Employer Check
-//     if (!employment.employerId) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Employer Id not found in employment details",
-//       });
-//     }
-
-//     // Duplicate Check
-//     const alreadyExist = await EmploymentVerificationLog.findOne({
-//       profileId,
-//       employmentDetailsId,
-//     });
-
-//     if (alreadyExist) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Employment Verification already created.",
-//       });
-//     }
-
-//     // Create Verification Log
-
-//     const verification = new EmploymentVerificationLog({
-//       profileId,
-//       employmentDetailsId,
-//       employedName: employment.employedName,
-//       employerId: employment.employerId,
-//       designation: employment.designation || "",
-//       jobStartDate: employment.jobStartDate,
-//       jobEndDate: employment.jobEndDate,
-//       salary: employment.salary,
-//       jobAddress: employment.jobAddress,
-//       status: "Pending",
-//       result: "Not Verified",
-//       createdBy,
-//     });
-
-//     const saveVerification = await verification.save();
-
-//     // Deduct Credits
-//     await deductAgencyCredits(agencyId, 5);
-
-//     // Send Email
-//     try {
-//       if (profile.email) {
-//         const transporter = nodemailer.createTransport({
-//           service: "gmail",
-
-//           auth: {
-//             user: process.env.EMAIL_USER,
-//             pass: process.env.EMAIL_PASS.replace(/\s/g, ""),
-//           },
-
-//           tls: {
-//             rejectUnauthorized: false,
-//           },
-//         });
-
-//         await transporter.sendMail({
-//           from: process.env.EMAIL_USER,
-//           to: profile.email,
-//           subject: "Employment Verification Started",
-
-//           html: `
-
-//           <h2>Hello ${profile.candidateName}</h2>
-
-//           <p>
-//           Your employment verification request has been created successfully.
-//           </p>
-
-//           <table border="1" cellpadding="8">
-
-//           <tr>
-//           <td><b>Company Name</b></td>
-//           <td>${employment.employedName}</td>
-//           </tr>
-
-//           <tr>
-//           <td><b>Designation</b></td>
-//           <td>${employment.designation || "-"}</td>
-//           </tr>
-
-//           <tr>
-//           <td><b>Joining Date</b></td>
-//           <td>${employment.jobStartDate || "-"}</td>
-//           </tr>
-
-//           <tr>
-//           <td><b>Last Working Date</b></td>
-//           <td>${employment.jobEndDate || "-"}</td>
-//           </tr>
-
-//           <tr>
-//           <td><b>Salary</b></td>
-//           <td>${employment.salary || "-"}</td>
-//           </tr>
-
-//           <tr>
-//           <td><b>Status</b></td>
-//           <td>Pending</td>
-//           </tr>
-
-//           </table>
-
-//           <p>
-//           We will notify you once verification is completed.
-//           </p>
-
-//           `,
-//         });
-//       }
-//     } catch (emailError) {
-//       console.log("Email sending failed:", emailError.message);
-//     }
-
-//     return res.status(201).json({
-//       success: true,
-//       message: "Employment Verification created successfully.",
-//       data: saveVerification,
-//     });
-//   } catch (error) {
-//     console.log(error);
-
-//     if (error.message === "Insufficient credits") {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Insufficient credits. Please add credits.",
-//       });
-//     }
-
-//     if (error.name === "ValidationError") {
-//       const errors = Object.values(error.errors).map((e) => e.message);
-
-//       return res.status(400).json({
-//         success: false,
-//         message: errors.join(", "),
-//       });
-//     }
-
-//     return res.status(500).json({
-//       success: false,
-//       message: "Internal Server Error",
-//     });
-//   }
-// };
+import readEmails from "../emailReaderService.js";
+import User from "../models/User.js";
+import path from "path";
+import fs from "fs";
 
 export const createEmploymentVerificationLog = async (req, res) => {
   try {
@@ -239,7 +34,6 @@ export const createEmploymentVerificationLog = async (req, res) => {
         message: "Valid Employment Details Id is required",
       });
     }
-
     // Login User
     const createdBy = req.user?.id;
 
@@ -250,13 +44,28 @@ export const createEmploymentVerificationLog = async (req, res) => {
       });
     }
 
-    // Agency Id
-    const agencyId = req.user?.refid;
+    // Reference ID & Model
+    const refid = req.user?.refid;
+    const refModel = req.user?.refModel;
 
-    if (!agencyId) {
+    if (!refid) {
       return res.status(400).json({
         success: false,
-        message: "Agency not assigned to user",
+        message: "Reference ID not found",
+      });
+    }
+
+    if (!refModel) {
+      return res.status(400).json({
+        success: false,
+        message: "Reference model not found",
+      });
+    }
+
+    if (!["Agency", "MasterEmployer"].includes(refModel)) {
+      return res.status(400).json({
+        success: false,
+        message: "Only Agency or MasterEmployer can create verification",
       });
     }
 
@@ -298,6 +107,20 @@ export const createEmploymentVerificationLog = async (req, res) => {
       });
     }
 
+    // Find User linked with Employer
+    const user = await User.findOne({
+      refid: employer._id,
+      refModel: "MasterEmployer",
+      isActive: true,
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found for this Employer",
+      });
+    }
+
     // Duplicate Check
     const alreadyExist = await EmploymentVerificationLog.findOne({
       profileId,
@@ -310,7 +133,12 @@ export const createEmploymentVerificationLog = async (req, res) => {
         message: "Employment Verification already created.",
       });
     }
-
+    // await deductAgencyCredits(agencyId, 5);
+    await deductCredits({
+      refid,
+      refModel,
+      amount: 5,
+    });
     // Create Verification Log
     const verification = new EmploymentVerificationLog({
       profileId,
@@ -318,10 +146,12 @@ export const createEmploymentVerificationLog = async (req, res) => {
       employedName: employment.employedName,
       employerId: employment.employerId,
       designation: employment.designation || "",
+      employeeId: employment.employeeId || "",
       jobStartDate: employment.jobStartDate,
       jobEndDate: employment.jobEndDate,
       salary: employment.salary,
       jobAddress: employment.jobAddress,
+      attachment: employment.attachment,
       status: "Pending",
       result: "Not Verified",
       createdBy,
@@ -329,27 +159,49 @@ export const createEmploymentVerificationLog = async (req, res) => {
 
     const saveVerification = await verification.save();
 
+    saveVerification.verificationEmailId = String(saveVerification._id);
+
+    await saveVerification.save();
+
+    // const verificationUrl = `${process.env.FRONTEND_URL}/EmploymentVerificationView/${employmentDetailsId}`;
+    const verificationUrl = `${process.env.FRONTEND_URL}/EmploymentVerificationView/${employmentDetailsId}/${user._id}`;
+
     // Deduct Credits
-    await deductAgencyCredits(agencyId, 5);
+    // await deductAgencyCredits(agencyId, 5);
 
     // Send Email To Employer
     try {
       if (employer.email) {
         const transporter = nodemailer.createTransport({
-          service: "gmail",
+          host: process.env.SMTP_HOST,
+          port: Number(process.env.SMTP_PORT),
+          secure: false,
           auth: {
             user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS.replace(/\s/g, ""),
-          },
-          tls: {
-            rejectUnauthorized: false,
+            pass: process.env.EMAIL_PASS,
           },
         });
+
+        if (!employment.attachment) {
+          throw new Error("Employment attachment path is missing in database");
+        }
+
+        const relativeAttachmentPath = employment.attachment
+          .replace(/^[/\\]+/, "")
+          .replace(/\//g, path.sep);
+
+        const attachmentPath = path.join(process.cwd(), relativeAttachmentPath);
+
+        if (!fs.existsSync(attachmentPath)) {
+          throw new Error(
+            `Employment attachment file not found on server: ${attachmentPath}`,
+          );
+        }
 
         await transporter.sendMail({
           from: process.env.EMAIL_USER,
           to: employer.email,
-          subject: "Employment Verification Request",
+          subject: `Employment Verification Request #${saveVerification._id}`,
 
           html: `
             <h2>Hello ${employer.name},</h2>
@@ -359,7 +211,10 @@ export const createEmploymentVerificationLog = async (req, res) => {
             </p>
 
             <table border="1" cellpadding="8" cellspacing="0">
-
+              <tr>
+                <td><b>Verification ID</b></td>
+                <td>${saveVerification._id}</td>
+              </tr>
               <tr>
                 <td><b>Candidate Name</b></td>
                 <td>${profile.candidateName}</td>
@@ -378,6 +233,11 @@ export const createEmploymentVerificationLog = async (req, res) => {
               <tr>
                 <td><b>Company Name</b></td>
                 <td>${employment.employedName}</td>
+              </tr>
+
+              <tr>
+                <td><b>Employee ID</b></td>
+                <td>${employment.employeeId || "-"}</td>
               </tr>
 
               <tr>
@@ -405,24 +265,39 @@ export const createEmploymentVerificationLog = async (req, res) => {
                 <td>${employment.jobAddress || "-"}</td>
               </tr>
 
-              <tr>
-                <td><b>Status</b></td>
-                <td>Pending</td>
-              </tr>
-
             </table>
 
             <br/>
 
             <p>
-              Kindly verify the employment details and update the verification status.
+              You can verify the employment details by replying to this email or by clicking the “ Verify Employment ” button below.
             </p>
-
+            <br/>
+<a
+  href="${verificationUrl}"
+  style="
+    display: inline-block;
+    padding: 12px 24px;
+    background-color: #0d6efd;
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: bold;
+  "
+>
+  Verify Employment
+</a>
             <p>
               Thanks,<br/>
               Employment Verification Team
             </p>
           `,
+          attachments: [
+            {
+              filename: path.basename(attachmentPath),
+              path: attachmentPath,
+            },
+          ],
         });
       }
     } catch (emailError) {
@@ -462,7 +337,7 @@ export const createEmploymentVerificationLog = async (req, res) => {
 
 export const getEmploymentVerificationLogs = async (req, res) => {
   try {
-    const createdBy = req.user?.id || null;
+    const createdBy = req.user?.id;
 
     if (!createdBy) {
       return res.status(401).json({
@@ -475,28 +350,87 @@ export const getEmploymentVerificationLogs = async (req, res) => {
       createdBy,
     })
       .populate("employerId", "employerName")
+      .populate("profileId", "candidateName email mobile")
+      .populate("createdBy", "name email")
+      .populate("verifiedBy", "name email")
+      .populate("updatedBy", "name email")
       .sort({
         createdDate: -1,
       });
 
     const data = verificationList.map((verification) => ({
       id: verification._id,
-      profileId: verification.profileId,
+
+      // Profile Details
+      profileId: verification.profileId?._id,
+      candidateName: verification.profileId?.candidateName || null,
+      candidateEmail: verification.profileId?.email || null,
+      candidateMobile: verification.profileId?.mobile || null,
+
+      // Employment Details
       employmentDetailsId: verification.employmentDetailsId,
       employedName: verification.employedName,
-      employerId: verification.employerId?._id || verification.employerId,
-      employerName: verification.employerId?.employerName || null,
       designation: verification.designation,
+      employeeId: verification.employeeId,
       jobStartDate: verification.jobStartDate,
       jobEndDate: verification.jobEndDate,
       salary: verification.salary,
       jobAddress: verification.jobAddress,
+
+      // Employer
+      employerId: verification.employerId?._id || verification.employerId,
+      employerName: verification.employerId?.employerName || null,
+
+      // Verification
       status: verification.status,
       result: verification.result,
       remarks: verification.remarks,
-      createdBy: verification.createdBy,
-      verifiedBy: verification.verifiedBy,
+      attachment: verification.attachment,
+
+      verificationEmailId: verification.verificationEmailId,
+
+      // Employer Replies
+      employerReplies: verification.employerReplies || [],
+      replyCount: verification.employerReplies?.length || 0,
+      latestReply:
+        verification.employerReplies?.length > 0
+          ? verification.employerReplies[
+              verification.employerReplies.length - 1
+            ]
+          : null,
+
+      // Created By
+      createdBy: verification.createdBy
+        ? {
+            id: verification.createdBy._id,
+            name: verification.createdBy.name,
+            email: verification.createdBy.email,
+          }
+        : null,
+
+      // Verified By
+      verifiedBy: verification.verifiedBy
+        ? {
+            id: verification.verifiedBy._id,
+            name: verification.verifiedBy.name,
+            email: verification.verifiedBy.email,
+          }
+        : null,
+
       verifiedDate: verification.verifiedDate,
+
+      // Updated By
+      updatedBy: verification.updatedBy
+        ? {
+            id: verification.updatedBy._id,
+            name: verification.updatedBy.name,
+            email: verification.updatedBy.email,
+          }
+        : null,
+
+      updatedDate: verification.updatedDate,
+
+      // Dates
       createdDate: verification.createdDate,
     }));
 
@@ -527,7 +461,7 @@ export const getEmploymentVerificationById = async (req, res) => {
       });
     }
 
-    const createdBy = req.user?.id || null;
+    const createdBy = req.user?.id;
 
     if (!createdBy) {
       return res.status(401).json({
@@ -539,7 +473,12 @@ export const getEmploymentVerificationById = async (req, res) => {
     const verification = await EmploymentVerificationLog.findOne({
       _id: id,
       createdBy,
-    }).populate("employerId", "employerName");
+    })
+      .populate("employerId", "employerName")
+      .populate("profileId", "candidateName email mobile")
+      .populate("createdBy", "name email")
+      .populate("verifiedBy", "name email")
+      .populate("updatedBy", "name email");
 
     if (!verification) {
       return res.status(404).json({
@@ -550,22 +489,77 @@ export const getEmploymentVerificationById = async (req, res) => {
 
     const data = {
       id: verification._id,
-      profileId: verification.profileId,
+
+      // Profile Details
+      profileId: verification.profileId?._id,
+      candidateName: verification.profileId?.candidateName || null,
+      candidateEmail: verification.profileId?.email || null,
+      candidateMobile: verification.profileId?.mobile || null,
+
+      // Employment Details
       employmentDetailsId: verification.employmentDetailsId,
       employedName: verification.employedName,
-      employerId: verification.employerId?._id || verification.employerId,
-      employerName: verification.employerId?.employerName || null,
       designation: verification.designation,
+      employeeId: verification.employeeId,
       jobStartDate: verification.jobStartDate,
       jobEndDate: verification.jobEndDate,
       salary: verification.salary,
       jobAddress: verification.jobAddress,
+
+      // Employer Details
+      employerId: verification.employerId?._id || verification.employerId,
+      employerName: verification.employerId?.employerName || null,
+
+      // Verification Details
       status: verification.status,
       result: verification.result,
       remarks: verification.remarks,
-      createdBy: verification.createdBy,
-      verifiedBy: verification.verifiedBy,
+      attachment: verification.attachment,
+
+      verificationEmailId: verification.verificationEmailId,
+
+      // Employer Replies
+      employerReplies: verification.employerReplies || [],
+      replyCount: verification.employerReplies?.length || 0,
+      latestReply:
+        verification.employerReplies?.length > 0
+          ? verification.employerReplies[
+              verification.employerReplies.length - 1
+            ]
+          : null,
+
+      // Created By
+      createdBy: verification.createdBy
+        ? {
+            id: verification.createdBy._id,
+            name: verification.createdBy.name,
+            email: verification.createdBy.email,
+          }
+        : null,
+
+      // Verified By
+      verifiedBy: verification.verifiedBy
+        ? {
+            id: verification.verifiedBy._id,
+            name: verification.verifiedBy.name,
+            email: verification.verifiedBy.email,
+          }
+        : null,
+
       verifiedDate: verification.verifiedDate,
+
+      // Updated By
+      updatedBy: verification.updatedBy
+        ? {
+            id: verification.updatedBy._id,
+            name: verification.updatedBy.name,
+            email: verification.updatedBy.email,
+          }
+        : null,
+
+      updatedDate: verification.updatedDate,
+
+      // Dates
       createdDate: verification.createdDate,
     };
 
@@ -579,149 +573,17 @@ export const getEmploymentVerificationById = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Internal Server Error",
     });
   }
 };
 
-// export const updateEmploymentVerificationLog = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-
-//     const { status, remarks, result } = req.body;
-
-//     // Validate Id
-//     if (!mongoose.Types.ObjectId.isValid(id)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid Employment Verification Id",
-//       });
-//     }
-
-//     const createdBy = req.user?.id || null;
-
-//     if (!createdBy) {
-//       return res.status(401).json({
-//         success: false,
-//         message: "User authentication required",
-//       });
-//     }
-
-//     // Find Verification
-//     const verification = await EmploymentVerificationLog.findById(id);
-
-//     if (!verification) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Employment Verification not found",
-//       });
-//     }
-
-//     // Deduct Credits when status changes to Verified
-//     if (status === "Verified" && verification.status !== "Verified") {
-//       const agencyId = req.user?.refid;
-
-//       if (!agencyId) {
-//         return res.status(400).json({
-//           success: false,
-//           message: "Agency not assigned to user",
-//         });
-//       }
-
-//       await deductAgencyCredits(agencyId, 5);
-//     }
-
-//     // Status Update
-//     if (status !== undefined) {
-//       const validStatus = ["Pending", "Verified", "Rejected", "Not Found"];
-
-//       if (!validStatus.includes(status)) {
-//         return res.status(400).json({
-//           success: false,
-//           message: "Invalid Status",
-//         });
-//       }
-
-//       verification.status = status;
-//     }
-
-//     // Remarks Update
-//     if (remarks !== undefined) {
-//       verification.remarks = remarks.trim();
-//     }
-
-//     // Result Update
-//     if (result !== undefined) {
-//       const validResult = ["Ok", "No Found", "Not Verified"];
-
-//       if (!validResult.includes(result)) {
-//         return res.status(400).json({
-//           success: false,
-//           message: "Invalid Result",
-//         });
-//       }
-
-//       verification.result = result;
-//     }
-
-//     verification.verifiedBy = createdBy;
-//     verification.verifiedDate = new Date();
-
-//     const updatedVerification = await verification.save();
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Employment Verification updated successfully",
-//       data: updatedVerification,
-//     });
-//   } catch (error) {
-//     console.log(error);
-
-//     if (error.message === "Insufficient credits") {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Insufficient credits. Please add credits.",
-//       });
-//     }
-
-//     if (error.message === "Agency not found") {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Agency not found",
-//       });
-//     }
-
-//     if (error.name === "ValidationError") {
-//       const messages = Object.values(error.errors).map((err) => err.message);
-
-//       return res.status(400).json({
-//         success: false,
-//         message: messages.join(", "),
-//       });
-//     }
-
-//     return res.status(500).json({
-//       success: false,
-//       message: "Internal Server Error",
-//     });
-//   }
-// };
-
-export const updateEmploymentVerificationLog = async (req, res) => {
+export const getEmploymentVerificationLogByEmploymentDetailsId = async (
+  req,
+  res,
+) => {
   try {
-    const { id } = req.params;
-
-    const { status, remarks, result } = req.body;
-
-    // Validate Id
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid Employment Verification Id",
-      });
-    }
-
-    const createdBy = req.user?.id || null;
+    const createdBy = req.user?.id;
 
     if (!createdBy) {
       return res.status(401).json({
@@ -730,7 +592,117 @@ export const updateEmploymentVerificationLog = async (req, res) => {
       });
     }
 
+    const { employmentDetailsId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(employmentDetailsId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Employment Details Id",
+      });
+    }
+
+    const verification = await EmploymentVerificationLog.findOne({
+      employmentDetailsId,
+      createdBy,
+    })
+      .populate("profileId")
+      .populate("employerId", "employerName")
+      .populate("createdBy", "name email")
+      .populate("verifiedBy", "name email")
+      .populate("updatedBy", "name email");
+
+    if (!verification) {
+      return res.status(404).json({
+        success: false,
+        message: "Employment Verification Log not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: verification._id,
+        profileId: verification.profileId,
+        employmentDetailsId: verification.employmentDetailsId,
+
+        employedName: verification.employedName,
+
+        employerId: verification.employerId?._id,
+        employerName: verification.employerId?.employerName,
+
+        designation: verification.designation,
+        employeeId: verification.employeeId,
+        jobStartDate: verification.jobStartDate,
+        jobEndDate: verification.jobEndDate,
+        salary: verification.salary,
+        jobAddress: verification.jobAddress,
+
+        status: verification.status,
+        result: verification.result,
+        remarks: verification.remarks,
+        attachment: verification.attachment,
+
+        verificationEmailId: verification.verificationEmailId,
+
+        // employerReplies: verification.employerReplies,
+        employerReplies: verification.employerReplies?.slice().reverse(),
+
+        createdBy: verification.createdBy,
+        verifiedBy: verification.verifiedBy,
+        verifiedDate: verification.verifiedDate,
+
+        updatedBy: verification.updatedBy,
+        updatedDate: verification.updatedDate,
+
+        createdDate: verification.createdDate,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching Employment Verification Log",
+    });
+  }
+};
+
+export const verifyEmploymentVerification = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { remarks } = req.body;
+
+    // Validate Employment Verification Id
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Employment Verification Id",
+      });
+    }
+
+    // Validate Remarks
+
+    if (!remarks || !remarks.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Verification remarks are required",
+      });
+    }
+
+    // Login User
+
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User authentication required",
+      });
+    }
+
     // Find Verification
+
     const verification = await EmploymentVerificationLog.findById(id);
 
     if (!verification) {
@@ -740,190 +712,911 @@ export const updateEmploymentVerificationLog = async (req, res) => {
       });
     }
 
-    // Deduct Credits when status changes to Verified
-    if (status === "Verified" && verification.status !== "Verified") {
-      const agencyId = req.user?.refid;
+    // Already Verified Check
 
-      if (!agencyId) {
-        return res.status(400).json({
-          success: false,
-          message: "Agency not assigned to user",
-        });
-      }
-
-      await deductAgencyCredits(agencyId, 5);
+    if (verification.status === "Verified") {
+      return res.status(400).json({
+        success: false,
+        message: "Employment Verification is already verified",
+      });
     }
 
-    // Status Update
-    if (status !== undefined) {
-      const validStatus = ["Pending", "Verified", "Rejected", "Not Found"];
+    // Already Rejected Check
 
-      if (!validStatus.includes(status)) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid Status",
-        });
-      }
-
-      verification.status = status;
+    if (verification.status === "Rejected") {
+      return res.status(400).json({
+        success: false,
+        message: "Employment Verification is already rejected",
+      });
     }
 
-    // Remarks Update
-    if (remarks !== undefined) {
-      verification.remarks = remarks.trim();
-    }
+    // Update Verification
 
-    // Result Update
-    if (result !== undefined) {
-      const validResult = ["Ok", "No Found", "Not Verified"];
+    verification.status = "Verified";
+    verification.result = "Ok";
 
-      if (!validResult.includes(result)) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid Result",
-        });
-      }
+    // Save Remarks
+    verification.remarks = remarks.trim();
 
-      verification.result = result;
-    }
-
-    verification.verifiedBy = createdBy;
+    // Verified By
+    verification.verifiedBy = userId;
     verification.verifiedDate = new Date();
 
-    const updatedVerification = await verification.save();
+    // Updated By
+    verification.updatedBy = userId;
+    verification.updatedDate = new Date();
 
-    // Get Profile
-    const profile = await ProfileManager.findById(verification.profileId);
+    // Save
 
-    // Get Employer
-    const employer = await MasterEmployer.findById(verification.employerId);
+    await verification.save();
 
-    // Send Email To Employer
-    try {
-      if (employer && employer.email) {
-        const transporter = nodemailer.createTransport({
-          service: "gmail",
-          auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS.replace(/\s/g, ""),
-          },
-          tls: {
-            rejectUnauthorized: false,
-          },
-        });
-
-        await transporter.sendMail({
-          from: process.env.EMAIL_USER,
-          to: employer.email,
-          subject: "Employment Verification Status Updated",
-
-          html: `
-            <h2>Hello ${employer.name},</h2>
-
-            <p>
-              Employment verification has been updated successfully.
-            </p>
-
-            <table border="1" cellpadding="8" cellspacing="0">
-
-              <tr>
-                <td><b>Candidate Name</b></td>
-                <td>${profile?.candidateName || "-"}</td>
-              </tr>
-
-              <tr>
-                <td><b>Candidate Email</b></td>
-                <td>${profile?.email || "-"}</td>
-              </tr>
-
-              <tr>
-                <td><b>Candidate Mobile</b></td>
-                <td>${profile?.mobile || "-"}</td>
-              </tr>
-
-              <tr>
-                <td><b>Company Name</b></td>
-                <td>${verification.employedName}</td>
-              </tr>
-
-              <tr>
-                <td><b>Designation</b></td>
-                <td>${verification.designation || "-"}</td>
-              </tr>
-
-              <tr>
-                <td><b>Status</b></td>
-                <td>${verification.status}</td>
-              </tr>
-
-              <tr>
-                <td><b>Result</b></td>
-                <td>${verification.result}</td>
-              </tr>
-
-              <tr>
-                <td><b>Remarks</b></td>
-                <td>${verification.remarks || "-"}</td>
-              </tr>
-
-              <tr>
-                <td><b>Verified Date</b></td>
-                <td>${verification.verifiedDate}</td>
-              </tr>
-
-            </table>
-
-            <br/>
-
-            <p>
-              Kindly check the updated verification details.
-            </p>
-
-            <p>
-              Thanks,<br/>
-              Employment Verification Team
-            </p>
-          `,
-        });
-      }
-    } catch (emailError) {
-      console.log("Email sending failed:", emailError.message);
-    }
+    // Response
 
     return res.status(200).json({
       success: true,
-      message: "Employment Verification updated successfully",
-      data: updatedVerification,
+      message: "Employment Verification verified successfully",
+      data: verification,
     });
   } catch (error) {
-    console.log(error);
-
-    if (error.message === "Insufficient credits") {
-      return res.status(400).json({
-        success: false,
-        message: "Insufficient credits. Please add credits.",
-      });
-    }
-
-    if (error.message === "Agency not found") {
-      return res.status(404).json({
-        success: false,
-        message: "Agency not found",
-      });
-    }
-
-    if (error.name === "ValidationError") {
-      const messages = Object.values(error.errors).map((err) => err.message);
-
-      return res.status(400).json({
-        success: false,
-        message: messages.join(", "),
-      });
-    }
+    console.error("Verify Employment Error:", error);
 
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
+    });
+  }
+};
+
+export const rejectEmploymentVerification = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { remarks } = req.body;
+
+    // Validate Employment Verification Id
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Employment Verification Id",
+      });
+    }
+
+    // Validate Remarks
+
+    if (!remarks || !remarks.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Rejection remarks are required",
+      });
+    }
+
+    // Login User
+
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User authentication required",
+      });
+    }
+
+    // Find Verification
+
+    const verification = await EmploymentVerificationLog.findById(id);
+
+    if (!verification) {
+      return res.status(404).json({
+        success: false,
+        message: "Employment Verification not found",
+      });
+    }
+
+    // Already Verified Check
+
+    if (verification.status === "Verified") {
+      return res.status(400).json({
+        success: false,
+        message: "Verified Employment Verification cannot be rejected",
+      });
+    }
+
+    // Already Rejected Check
+
+    if (verification.status === "Rejected") {
+      return res.status(400).json({
+        success: false,
+        message: "Employment Verification is already rejected",
+      });
+    }
+
+    // Update Rejection Status
+
+    verification.status = "Rejected";
+    verification.result = "Not Verified";
+
+    // Save Rejection Remarks
+    verification.remarks = remarks.trim();
+
+    // Rejection User and Date
+
+    verification.verifiedBy = userId;
+    verification.verifiedDate = new Date();
+
+    // Updated User and Date
+
+    verification.updatedBy = userId;
+    verification.updatedDate = new Date();
+
+    // Save
+
+    await verification.save();
+
+    // Response
+
+    return res.status(200).json({
+      success: true,
+      message: "Employment Verification rejected successfully",
+      data: verification,
+    });
+  } catch (error) {
+    console.error("Reject Employment Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+};
+
+export const getEmploymentVerificationLogsBasemployerId = async (req, res) => {
+  try {
+    const { employerId, status } = req.params;
+
+    if (!employerId) {
+      return res.status(400).json({
+        success: false,
+        message: "employerId is required",
+      });
+    }
+
+    // Status Required
+
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        message: "status is required",
+      });
+    }
+
+    // Validate Employer ID
+
+    if (!mongoose.Types.ObjectId.isValid(employerId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid employerId",
+      });
+    }
+
+    // Validate Status
+
+    const allowedStatuses = ["Pending", "Responded", "Verified", "Rejected"];
+
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid status. Allowed statuses are: ${allowedStatuses.join(
+          ", ",
+        )}`,
+      });
+    }
+
+    const filter = {
+      employerId: new mongoose.Types.ObjectId(employerId),
+      status: status,
+    };
+
+    // Fetch Employment Verification Logs
+
+    const verificationList = await EmploymentVerificationLog.find(filter)
+      .populate("employerId", "employerName")
+      .populate("profileId", "candidateName email mobile")
+      .populate("createdBy", "name email")
+      .populate("verifiedBy", "name email")
+      .populate("updatedBy", "name email")
+      .sort({
+        createdDate: -1,
+      });
+
+    // Format Data
+
+    const data = verificationList.map((verification) => {
+      return {
+        // Main ID
+
+        id: verification._id,
+
+        // Profile Details
+
+        profileId: verification.profileId?._id || null,
+        candidateName: verification.profileId?.candidateName || null,
+        candidateEmail: verification.profileId?.email || null,
+        candidateMobile: verification.profileId?.mobile || null,
+        // Employment Details
+        employmentDetailsId: verification.employmentDetailsId,
+        employedName: verification.employedName,
+        designation: verification.designation || null,
+        employeeId: verification.employeeId || null,
+        jobStartDate: verification.jobStartDate || null,
+        jobEndDate: verification.jobEndDate || null,
+        salary: verification.salary || null,
+        jobAddress: verification.jobAddress || null,
+        attachment: verification.attachment,
+
+        // Employer Details
+
+        employerId:
+          verification.employerId?._id || verification.employerId || null,
+        employerName: verification.employerId?.employerName || null,
+
+        status: verification.status || null,
+        result: verification.result || null,
+        remarks: verification.remarks || null,
+        verificationEmailId: verification.verificationEmailId || null,
+
+        employerReplies: verification.employerReplies || [],
+        replyCount: verification.employerReplies?.length || 0,
+
+        latestReply:
+          verification.employerReplies?.length > 0
+            ? verification.employerReplies[
+                verification.employerReplies.length - 1
+              ]
+            : null,
+
+        createdBy: verification.createdBy
+          ? {
+              id: verification.createdBy._id,
+              name: verification.createdBy.name,
+              email: verification.createdBy.email,
+            }
+          : null,
+
+        verifiedBy: verification.verifiedBy
+          ? {
+              id: verification.verifiedBy._id,
+              name: verification.verifiedBy.name,
+              email: verification.verifiedBy.email,
+            }
+          : null,
+
+        verifiedDate: verification.verifiedDate || null,
+
+        updatedBy: verification.updatedBy
+          ? {
+              id: verification.updatedBy._id,
+              name: verification.updatedBy.name,
+              email: verification.updatedBy.email,
+            }
+          : null,
+
+        updatedDate: verification.updatedDate || null,
+
+        // Created Date
+
+        createdDate: verification.createdDate || null,
+      };
+    });
+
+    // Success Response
+
+    return res.status(200).json({
+      success: true,
+      message: "Employment verification logs fetched successfully",
+      count: data.length,
+      employerId: employerId,
+      status: status,
+      data: data,
+    });
+  } catch (error) {
+    console.error("getEmploymentVerificationLogsBasemployerId Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching Employment Verification Logs",
+      error: error.message,
+    });
+  }
+};
+
+// This API is used for public access.
+
+export const getEmploymentVerificationLogByEmploymentDetailsIdWeb = async (
+  req,
+  res,
+) => {
+  try {
+    const { employmentDetailsId } = req.params;
+
+    // console.log("=================================");
+    // console.log("PUBLIC EMPLOYMENT API CALLED");
+    // console.log("employmentDetailsId:", employmentDetailsId);
+    // console.log("=================================");
+
+    if (!employmentDetailsId) {
+      return res.status(400).json({
+        success: false,
+        message: "Employment Details Id is required",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(employmentDetailsId)) {
+      console.log("INVALID OBJECT ID:", employmentDetailsId);
+
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Employment Details Id",
+      });
+    }
+
+    // console.log(
+    //   "Searching MongoDB for:",
+    //   new mongoose.Types.ObjectId(employmentDetailsId),
+    // );
+
+    const verification = await EmploymentVerificationLog.findOne({
+      employmentDetailsId: new mongoose.Types.ObjectId(employmentDetailsId),
+    });
+
+    if (!verification) {
+      return res.status(404).json({
+        success: false,
+        message: "Employment Verification Log not found",
+      });
+    }
+
+    const populatedVerification = await EmploymentVerificationLog.findById(
+      verification._id,
+    )
+      .populate("profileId")
+      .populate("employerId", "employerName email")
+      .populate("createdBy", "name email")
+      .populate("verifiedBy", "name email")
+      .populate("updatedBy", "name email");
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: populatedVerification._id,
+        profileId: populatedVerification.profileId,
+        employmentDetailsId: populatedVerification.employmentDetailsId,
+        employedName: populatedVerification.employedName,
+        employerId: populatedVerification.employerId?._id,
+        employerName: populatedVerification.employerId?.employerName,
+        employerEmail: populatedVerification.employerId?.email,
+        designation: populatedVerification.designation,
+        employeeId: populatedVerification.employeeId,
+        jobStartDate: populatedVerification.jobStartDate,
+        jobEndDate: populatedVerification.jobEndDate,
+        salary: populatedVerification.salary,
+        jobAddress: populatedVerification.jobAddress,
+        status: populatedVerification.status,
+        result: populatedVerification.result,
+        remarks: populatedVerification.remarks,
+        attachment: verification.attachment,
+
+        verificationEmailId: populatedVerification.verificationEmailId,
+        employerReplies: populatedVerification.employerReplies
+          ?.slice()
+          .reverse(),
+        createdBy: populatedVerification.createdBy,
+        verifiedBy: populatedVerification.verifiedBy,
+        verifiedDate: populatedVerification.verifiedDate,
+        updatedBy: populatedVerification.updatedBy,
+        updatedDate: populatedVerification.updatedDate,
+        createdDate: populatedVerification.createdDate,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Get Employment Verification Error:");
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching Employment Verification Log",
+      error: error.message,
+    });
+  }
+};
+
+export const sendEmailMessage = async (req, res) => {
+  try {
+    const { id, employerId, subject, message } = req.body;
+
+    // Validate Input
+
+    if (!id || !employerId || !subject?.trim() || !message?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Verification Id, Employer Id, Subject and Message are required",
+      });
+    }
+
+    // Login User
+
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User authentication required",
+      });
+    }
+
+    // Find Verification
+
+    const verification = await EmploymentVerificationLog.findById(id);
+
+    if (!verification) {
+      return res.status(404).json({
+        success: false,
+        message: "Verification record not found",
+      });
+    }
+
+    // Check Employer
+
+    if (verification.employerId.toString() !== employerId) {
+      return res.status(400).json({
+        success: false,
+        message: "Employer does not match this verification",
+      });
+    }
+
+    // Find Employer
+
+    const employer = await MasterEmployer.findById(employerId);
+
+    if (!employer) {
+      return res.status(404).json({
+        success: false,
+        message: "Employer not found",
+      });
+    }
+
+    // Employer Email Check
+
+    if (!employer.email) {
+      return res.status(400).json({
+        success: false,
+        message: "Employer email not found",
+      });
+    }
+
+    // Create Transporter
+
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT),
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    // Send Email
+
+    const info = await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: employer.email,
+      subject: subject.trim(),
+
+      html: `
+        <div style="font-family: Arial, sans-serif;">
+
+          <h3>${subject.trim()}</h3>
+
+          <p style="white-space: pre-wrap;">
+            ${message.trim()}
+          </p>
+
+          <br />
+
+          <p>
+            Thanks,<br />
+            Employment Verification Team
+          </p>
+
+        </div>
+      `,
+    });
+
+    // Save Email Conversation
+
+    verification.employerReplies.push({
+      messageId: info.messageId,
+      from: process.env.EMAIL_USER,
+      subject: subject.trim(),
+      message: message.trim(),
+      date: new Date(),
+      sendByVerification: true,
+    });
+
+    // Update Information
+
+    verification.updatedBy = userId;
+    verification.updatedDate = new Date();
+
+    // Save Verification
+
+    await verification.save();
+
+    // Response
+
+    return res.status(200).json({
+      success: true,
+      message: "Email sent successfully",
+      email: employer.email,
+    });
+  } catch (error) {
+    console.log("Email Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Email sending failed",
+    });
+  }
+};
+
+export const verifyEmploymentVerificationWeb = async (req, res) => {
+  try {
+    const { id, userId } = req.params;
+    const { remarks } = req.body;
+
+    // VALIDATE EMPLOYMENT VERIFICATION ID
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Employment Verification Id",
+      });
+    }
+
+    // VALIDATE USER ID
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid User Id",
+      });
+    }
+
+    // VALIDATE REMARKS
+
+    if (!remarks || !remarks.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Verification remarks are required",
+      });
+    }
+
+    // FIND EMPLOYMENT VERIFICATION
+
+    const verification = await EmploymentVerificationLog.findById(id);
+
+    if (!verification) {
+      return res.status(404).json({
+        success: false,
+        message: "Employment Verification not found",
+      });
+    }
+
+    // ALREADY VERIFIED CHECK
+
+    if (verification.status === "Verified") {
+      return res.status(400).json({
+        success: false,
+        message: "Employment Verification is already verified",
+      });
+    }
+
+    // ALREADY REJECTED CHECK
+
+    if (verification.status === "Rejected") {
+      return res.status(400).json({
+        success: false,
+        message: "Rejected Employment Verification cannot be verified",
+      });
+    }
+
+    // CURRENT DATE
+
+    const now = new Date();
+
+    // UPDATE VERIFICATION STATUS
+
+    verification.status = "Verified";
+    verification.result = "Ok";
+
+    // REMARKS
+
+    verification.remarks = remarks.trim();
+
+    // VERIFIED USER
+
+    verification.verifiedBy = userId;
+    verification.verifiedDate = now;
+
+    // UPDATED USER
+
+    verification.updatedBy = userId;
+    verification.updatedDate = now;
+
+    // RESPONSE DATE
+
+    verification.respondedDate = now;
+
+    // SAVE
+
+    await verification.save();
+
+    // SUCCESS RESPONSE
+
+    return res.status(200).json({
+      success: true,
+      message: "Employment Verification verified successfully",
+      data: verification,
+    });
+  } catch (error) {
+    console.error("Verify Employment Web Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
+export const rejectEmploymentVerificationWeb = async (req, res) => {
+  try {
+    // 1. GET PARAMS & BODY
+
+    const { id, userId } = req.params;
+    const { remarks } = req.body;
+
+    // 2. VALIDATE EMPLOYMENT VERIFICATION ID
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Employment Verification Id",
+      });
+    }
+
+    // 3. VALIDATE USER ID
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid User Id",
+      });
+    }
+
+    // 4. VALIDATE REMARKS
+
+    if (!remarks || !remarks.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Rejection remarks are required",
+      });
+    }
+
+    // 5. FIND EMPLOYMENT VERIFICATION
+
+    const verification = await EmploymentVerificationLog.findById(id);
+
+    if (!verification) {
+      return res.status(404).json({
+        success: false,
+        message: "Employment Verification not found",
+      });
+    }
+
+    // 6. ALREADY VERIFIED CHECK
+
+    if (verification.status === "Verified") {
+      return res.status(400).json({
+        success: false,
+        message: "Verified Employment Verification cannot be rejected",
+      });
+    }
+
+    // 7. ALREADY REJECTED CHECK
+
+    if (verification.status === "Rejected") {
+      return res.status(400).json({
+        success: false,
+        message: "Employment Verification is already rejected",
+      });
+    }
+
+    // 8. CURRENT DATE
+
+    const now = new Date();
+
+    // 9. UPDATE STATUS
+
+    verification.status = "Rejected";
+    verification.result = "Not Verified";
+
+    // 10. SAVE REJECTION REMARKS
+
+    verification.remarks = remarks.trim();
+
+    // 11. SAVE USER ID
+
+    // User ID jo email link me bheja gaya tha
+    verification.verifiedBy = userId;
+
+    // Agar schema me updatedBy field hai
+    verification.updatedBy = userId;
+
+    // 12. UPDATE DATES
+
+    verification.verifiedDate = now;
+    verification.updatedDate = now;
+    verification.respondedDate = now;
+
+    // 13. SAVE VERIFICATION
+
+    await verification.save();
+
+    // 14. SUCCESS RESPONSE
+
+    return res.status(200).json({
+      success: true,
+      message: "Employment Verification rejected successfully",
+      data: verification,
+    });
+  } catch (error) {
+    // 15. ERROR HANDLING
+
+    console.error("Reject Employment Verification Web Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
+export const getEmploymentDetailsId = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate Employment Verification ID
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid Employment Verification ID is required",
+        data: null,
+      });
+    }
+
+    // Fetch complete employment verification details
+    const verificationData = await EmploymentVerificationLog.findById(id)
+      .populate({
+        path: "profileId",
+      })
+      .populate({
+        path: "employerId",
+      })
+      .populate({
+        path: "createdBy",
+      })
+      .populate({
+        path: "verifiedBy",
+      })
+      .lean();
+
+    if (!verificationData) {
+      return res.status(404).json({
+        success: false,
+        message: "Employment verification details not found",
+        data: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Employment verification details fetched successfully",
+      data: verificationData,
+    });
+  } catch (error) {
+    console.error("getEmploymentDetailsId Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching employment verification details",
+      error: error.message,
+    });
+  }
+};
+
+export const saveEmployerEmail = async (req, res) => {
+  try {
+    const {
+      verificationId,
+      messageId,
+      from,
+      subject,
+      message,
+      date,
+      sendByVerification,
+    } = req.body;
+
+    // Verification ID validation
+    if (!verificationId || !mongoose.Types.ObjectId.isValid(verificationId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid verificationId is required",
+      });
+    }
+
+    // Message validation
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        message: "Email message is required",
+      });
+    }
+
+    // Find Employment Verification
+    const verification =
+      await EmploymentVerificationLog.findById(verificationId);
+
+    if (!verification) {
+      return res.status(404).json({
+        success: false,
+        message: "Employment verification not found",
+      });
+    }
+
+    // Email object
+    const emailReply = {
+      messageId: messageId || "",
+      from: from || "",
+      subject: subject || "",
+      message: message || "",
+      date: date ? new Date(date) : new Date(),
+
+      // true = verification LEFT
+      // false = employer RIGHT
+      sendByVerification:
+        sendByVerification === false || sendByVerification === "false",
+    };
+
+    // Save inside employerReplies
+    verification.employerReplies.push(emailReply);
+
+    await verification.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Employer email saved successfully",
+      data: verification,
+    });
+  } catch (error) {
+    console.error("SAVE EMPLOYER EMAIL ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to save employer email",
+      error: error.message,
     });
   }
 };

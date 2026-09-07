@@ -36,14 +36,32 @@ const educationVerificationLogSchema = new mongoose.Schema({
     trim: true,
   },
 
+  boardId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "BoardUniversity",
+    required: true,
+  },
+
   year: {
     type: Number,
     required: true,
   },
 
+  verificationMethod: {
+    type: String,
+    enum: ["Email", "API"],
+    required: true,
+  },
+
+  // status: {
+  //   type: String,
+  //   enum: ["Pending", "Verified"],
+  //   default: "Pending",
+  // },
+
   status: {
     type: String,
-    enum: ["Pending", "Verified"],
+    enum: ["Pending", "Responded", "Verified", "Rejected", "Not Found"],
     default: "Pending",
   },
 
@@ -57,6 +75,41 @@ const educationVerificationLogSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+
+    attachment: {
+    type: String,
+    trim: true,
+  },
+  
+  verificationReplies: [
+    {
+      messageId: {
+        type: String,
+      },
+
+      from: {
+        type: String,
+      },
+
+      subject: {
+        type: String,
+      },
+
+      message: {
+        type: String,
+      },
+
+      date: {
+        type: Date,
+        default: Date.now,
+      },
+
+      sendByVerification: {
+        type: Boolean,
+        default: false,
+      },
+    },
+  ],
 
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -75,6 +128,18 @@ const educationVerificationLogSchema = new mongoose.Schema({
   createdDate: {
     type: Date,
     default: Date.now,
+  },
+  updatedDate: {
+    type: Date,
+    default: Date.now,
+  },
+
+  sentDate: {
+    type: Date,
+  },
+
+  respondedDate: {
+    type: Date,
   },
 });
 

@@ -102,20 +102,22 @@ export const getUsers = async (req, res) => {
     const usersList = await User.find()
       .sort({ createdate: -1 })
       .populate("createby", "name email")
-      .populate("updateby", "name email");
+      .populate("updateby", "name email")
+      .populate("refid");
 
     const data = usersList.map((user) => ({
       id: user._id,
       name: user.name,
       email: user.email,
+      password: user.password,
       mobileNo: user.mobileNo,
+      UserRole: user.UserRole,
+      refid: user.refid,
       isActive: user.isActive,
-
-      createby: user.createby,
-      updateby: user.updateby,
-
       createdate: user.createdate,
+      createby: user.createby,
       updatedate: user.updatedate,
+      updateby: user.updateby,
     }));
 
     return res.status(200).json({
@@ -124,14 +126,66 @@ export const getUsers = async (req, res) => {
       data,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error fetching users:", error);
 
     return res.status(500).json({
       success: false,
       message: "Error fetching users",
+      error: error.message,
     });
   }
 };
+
+// export const getUserById = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     if (!mongoose.Types.ObjectId.isValid(id)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid User Id",
+//       });
+//     }
+
+//     const user = await User.findById(id)
+//       .populate("createby", "name email")
+//       .populate("updateby", "name email");
+
+//     if (!user) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "User not found",
+//       });
+//     }
+
+//     const data = {
+//       id: user._id,
+//       name: user.name,
+//       email: user.email,
+//       mobileNo: user.mobileNo,
+//       UserRole: user.UserRole,
+//       refid: user.refid,
+//       isActive: user.isActive,
+//       createby: user.createby,
+//       updateby: user.updateby,
+//       createdate: user.createdate,
+//       updatedate: user.updatedate,
+//     };
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "User fetched successfully",
+//       data,
+//     });
+//   } catch (error) {
+//     console.log(error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// };
 
 export const getUserById = async (req, res) => {
   try {
@@ -145,6 +199,7 @@ export const getUserById = async (req, res) => {
     }
 
     const user = await User.findById(id)
+      .populate("refid")
       .populate("createby", "name email")
       .populate("updateby", "name email");
 
@@ -160,9 +215,22 @@ export const getUserById = async (req, res) => {
       name: user.name,
       email: user.email,
       mobileNo: user.mobileNo,
+      UserRole: user.UserRole,
+
+      // Reference ID
+      refid: user.refid?._id || user.refid || null,
+
+      // Reference model
+      refModel: user.refModel,
+
+      // Optional: complete referenced data
+      refData: user.refid || null,
+
       isActive: user.isActive,
+
       createby: user.createby,
       updateby: user.updateby,
+
       createdate: user.createdate,
       updatedate: user.updatedate,
     };
@@ -173,7 +241,7 @@ export const getUserById = async (req, res) => {
       data,
     });
   } catch (error) {
-    console.log(error);
+    console.log("getUserById error:", error);
 
     return res.status(500).json({
       success: false,
@@ -357,28 +425,6 @@ export const getUsersToken = async (req, res) => {
 };
 
 // this is use for change user Password
-// export const changePassword = async (req, res) => {
-//   const { newPassword, confirmNewPassword } = req.body;
-
-//   try {
-//     const user = req.user;
-
-//     if (newPassword !== confirmNewPassword) {
-//       return res
-//         .status(400)
-//         .json({ message: "New password and confirm password do not match" });
-//     }
-
-//     user.password = newPassword;
-//     user.updatedate = new Date();
-//     await user.save();
-
-//     res.status(200).json({ message: "Password changed successfully" });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ message: "Server error" });
-//   }
-// };
 
 export const changePassword = async (req, res) => {
   try {

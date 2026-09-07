@@ -7,15 +7,38 @@ const agencySchema = new mongoose.Schema({
     trim: true,
   },
 
+  // gstNo: {
+  //   type: String,
+  //   unique: true,
+  //   uppercase: true,
+  //   trim: true,
+  //   match: [
+  //     /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
+  //     "Invalid GST Number",
+  //   ],
+  // },
+
   gstNo: {
     type: String,
     unique: true,
+    sparse: true,
     uppercase: true,
     trim: true,
-    match: [
-      /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
-      "Invalid GST Number",
-    ],
+    default: undefined,
+    validate: {
+      validator: function (value) {
+        // Empty / undefined / null -> valid
+        if (value === undefined || value === null || value === "") {
+          return true;
+        }
+
+        // Actual GST value -> format validate
+        return /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(
+          value,
+        );
+      },
+      message: "Invalid GST Number",
+    },
   },
 
   address: {
@@ -45,8 +68,10 @@ const agencySchema = new mongoose.Schema({
   tan: {
     type: String,
     unique: true,
+    sparse: true,
     uppercase: true,
     trim: true,
+    required: true,
   },
 
   email: {
@@ -71,6 +96,22 @@ const agencySchema = new mongoose.Schema({
   //   required: true,
   // },
 
+  panCardPDF: {
+    type: String,
+    trim: true,
+    required: true,
+  },
+
+  gstCertificatePDF: {
+    type: String,
+    trim: true,
+  },
+
+  companyRegistrationPDF: {
+    type: String,
+    trim: true,
+  },
+
   subscriptionId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Subscription",
@@ -81,7 +122,10 @@ const agencySchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
-
+  isApproved: {
+    type: Boolean,
+    default: false,
+  },
   createdDate: {
     type: Date,
     default: Date.now,

@@ -18,10 +18,18 @@
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "imap": "^0.8.19",
     "jsonwebtoken": "^9.0.3",
+    "mailparser": "^3.9.14",
     "mongoose": "^9.3.0",
     "multer": "^2.1.1",
+    "node-cron": "^4.6.0",
+    "node-pop3": "^0.15.0",
     "nodemailer": "^9.0.3",
+    "poplib": "^0.1.7",
     "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "sass": "^1.104.0"
   }
 }

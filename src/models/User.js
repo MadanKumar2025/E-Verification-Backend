@@ -29,7 +29,13 @@ const userSchema = new mongoose.Schema({
 
   refid: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Agency",
+    refPath: "refModel",
+  },
+
+  refModel: {
+    type: String,
+    enum: ["Agency", "MasterEmployer", "BoardUniversity"],
+    required: true,
   },
 
   isActive: {

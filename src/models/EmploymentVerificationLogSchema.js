@@ -30,6 +30,11 @@ const employmentVerificationLogSchema = new mongoose.Schema({
     trim: true,
   },
 
+  employeeId: {
+    type: String,
+    trim: true,
+  },
+
   jobStartDate: {
     type: Date,
     required: true,
@@ -49,19 +54,21 @@ const employmentVerificationLogSchema = new mongoose.Schema({
     trim: true,
   },
 
+  // status: {
+  //   type: String,
+  //   enum: ["Pending", "Verified"],
+  //   default: "Pending",
+  // },
+
   status: {
     type: String,
-    enum: ["Pending", "Verified"],
+    enum: ["Pending", "Responded", "Verified", "Rejected"],
     default: "Pending",
   },
 
   result: {
     type: String,
-    enum: [
-      "Ok",
-      "No Found",
-      "Not Verified"
-    ],
+    enum: ["Ok", "No Found", "Not Verified"],
     default: "Not Verified",
   },
 
@@ -70,6 +77,10 @@ const employmentVerificationLogSchema = new mongoose.Schema({
     trim: true,
   },
 
+  attachment: {
+    type: String,
+    trim: true,
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -85,6 +96,38 @@ const employmentVerificationLogSchema = new mongoose.Schema({
     type: Date,
   },
 
+  verificationEmailId: {
+    type: String,
+  },
+
+  employerReplies: [
+    {
+      messageId: {
+        type: String,
+      },
+
+      from: {
+        type: String,
+      },
+
+      subject: {
+        type: String,
+      },
+
+      message: {
+        type: String,
+      },
+
+      date: {
+        type: Date,
+        default: Date.now,
+      },
+      sendByVerification: {
+        type: Boolean,
+      },
+    },
+  ],
+
   createdDate: {
     type: Date,
     default: Date.now,
@@ -98,9 +141,7 @@ const employmentVerificationLogSchema = new mongoose.Schema({
   updatedDate: {
     type: Date,
   },
-
 });
-
 
 // Faster search ke liye indexes
 employmentVerificationLogSchema.index({
@@ -108,8 +149,7 @@ employmentVerificationLogSchema.index({
   employmentDetailsId: 1,
 });
 
-
 export default mongoose.model(
   "EmploymentVerificationLog",
-  employmentVerificationLogSchema
+  employmentVerificationLogSchema,
 );

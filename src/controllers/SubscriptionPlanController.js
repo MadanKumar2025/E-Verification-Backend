@@ -321,3 +321,35 @@ export const updateSubscriptionStatus = async (req, res) => {
   }
 };
 
+export const getSubscriptionsPublic = async (req, res) => {
+  try {
+    const subscriptionList = await Subscription.find({
+      isActive: true,
+    }).sort({ createdAt: -1 });
+
+    const data = subscriptionList.map((subscription) => ({
+      id: subscription._id,
+      subscriptionPlanName: subscription.subscriptionPlanName,
+      amount: subscription.amount,
+      durationInDays: subscription.durationInDays,
+      credits: subscription.credits,
+      details: subscription.details,
+      isActive: subscription.isActive,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      count: data.length,
+      data,
+    });
+  } catch (error) {
+    console.error("getSubscriptionsPublic Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching subscriptions",
+    });
+  }
+};
+
+
