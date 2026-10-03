@@ -4,6 +4,10 @@ import nodemailer from "nodemailer";
 import ProfileManager from "../models/ProfileManagerSchema.js";
 import EducationVerificationLog from "../models/EducationVerificationLogSchema.js";
 import BoardUniversity from "../models/BoardUniversitySchema.js";
+import CreditTransaction from "../models/creditTransactionSchema.js";
+import Agency from "../models/AgenciesSchema.js";
+import MasterEmployer from "../models/MasterEmployerSchema.js";
+
 import User from "../models/User.js";
 
 import path from "path";
@@ -14,7 +18,8 @@ export const createEducationVerificationLog = async (req, res) => {
   try {
     const { profileId, educationId } = req.body;
 
-    // PROFILE ID VALIDATION
+    // 1. PROFILE ID VALIDATION
+
     if (!profileId || !mongoose.Types.ObjectId.isValid(profileId)) {
       return res.status(400).json({
         success: false,
@@ -22,7 +27,8 @@ export const createEducationVerificationLog = async (req, res) => {
       });
     }
 
-    // EDUCATION ID VALIDATION
+    // 2. EDUCATION ID VALIDATION
+
     if (!educationId || !mongoose.Types.ObjectId.isValid(educationId)) {
       return res.status(400).json({
         success: false,
@@ -30,8 +36,9 @@ export const createEducationVerificationLog = async (req, res) => {
       });
     }
 
-    // LOGIN USER
-    const createdBy = req.user?.id;
+    // 3. LOGIN USER
+
+    const createdBy = req.user?.id || req.user?._id;
 
     if (!createdBy) {
       return res.status(401).json({
@@ -40,15 +47,7 @@ export const createEducationVerificationLog = async (req, res) => {
       });
     }
 
-    // AGENCY ID
-    // const agencyId = req.user?.refid;
-
-    // if (!agencyId) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "Agency not assigned to user",
-    //   });
-    // }
+    // 4. AGENCY / MASTER EMPLOYER
 
     const refid = req.user?.refid;
     const refModel = req.user?.refModel;
@@ -60,7 +59,15 @@ export const createEducationVerificationLog = async (req, res) => {
       });
     }
 
-    // FIND PROFILE
+    if (!["Agency", "MasterEmployer"].includes(refModel)) {
+      return res.status(400).json({
+        success: false,
+        message: "Only Agency or MasterEmployer can create verification",
+      });
+    }
+
+    // 5. FIND PROFILE
+
     const profile = await ProfileManager.findById(profileId);
 
     if (!profile) {
@@ -70,7 +77,8 @@ export const createEducationVerificationLog = async (req, res) => {
       });
     }
 
-    // FIND EDUCATION
+    // 6. FIND EDUCATION
+
     const education = profile.educationDetails.id(educationId);
 
     if (!education) {
@@ -80,16 +88,17 @@ export const createEducationVerificationLog = async (req, res) => {
       });
     }
 
-    const attachment = education.attachment;
+    // 7. ATTACHMENT CHECK
 
-    if (!attachment) {
+    if (!education.attachment) {
       return res.status(400).json({
         success: false,
         message: "Education attachment not found",
       });
     }
 
-    // EDUCATION BOARD ID CHECK
+    // 8. BOARD ID CHECK
+
     if (!education.boardId) {
       return res.status(400).json({
         success: false,
@@ -97,7 +106,8 @@ export const createEducationVerificationLog = async (req, res) => {
       });
     }
 
-    // FIND BOARD UNIVERSITY USER
+    // 9. FIND BOARD UNIVERSITY USER
+
     const user = await User.findOne({
       refid: education.boardId,
       refModel: "BoardUniversity",
@@ -111,7 +121,8 @@ export const createEducationVerificationLog = async (req, res) => {
       });
     }
 
-    // EDUCATION YEAR CHECK
+    // 10. EDUCATION YEAR CHECK
+
     if (!education.year) {
       return res.status(400).json({
         success: false,
@@ -119,7 +130,8 @@ export const createEducationVerificationLog = async (req, res) => {
       });
     }
 
-    // FIND BOARD / UNIVERSITY
+    // 11. FIND BOARD / UNIVERSITY
+
     const boardUniversity = await BoardUniversity.findById(education.boardId);
 
     if (!boardUniversity) {
@@ -129,7 +141,8 @@ export const createEducationVerificationLog = async (req, res) => {
       });
     }
 
-    // BOARD YEAR CHECK
+    // 12. BOARD YEAR CHECK
+
     if (!boardUniversity.year) {
       return res.status(400).json({
         success: false,
@@ -137,7 +150,8 @@ export const createEducationVerificationLog = async (req, res) => {
       });
     }
 
-    // DECIDE VERIFICATION METHOD
+    // 13. DECIDE VERIFICATION METHOD
+
     let verificationMethod = "";
 
     if (education.year < boardUniversity.year) {
@@ -146,7 +160,8 @@ export const createEducationVerificationLog = async (req, res) => {
       verificationMethod = "API";
     }
 
-    // EMAIL VALIDATION
+    // 14. EMAIL VALIDATION
+
     if (verificationMethod === "Email") {
       if (!boardUniversity.boardEmail) {
         return res.status(400).json({
@@ -158,7 +173,8 @@ export const createEducationVerificationLog = async (req, res) => {
       }
     }
 
-    // API VALIDATION
+    // 15. API VALIDATION
+
     if (verificationMethod === "API") {
       if (!boardUniversity.boardApi) {
         if (boardUniversity.boardEmail) {
@@ -174,7 +190,8 @@ export const createEducationVerificationLog = async (req, res) => {
       }
     }
 
-    // DUPLICATE CHECK
+    // 16. DUPLICATE CHECK
+
     const alreadyExist = await EducationVerificationLog.findOne({
       profileId,
       educationId,
@@ -187,58 +204,229 @@ export const createEducationVerificationLog = async (req, res) => {
       });
     }
 
-    // DEDUCT AGENCY CREDITS
-    // await deductAgencyCredits(agencyId, 5);
-    await deductCredits({
-      refid,
-      refModel,
-      amount: 5,
-    });
+    // ============================================================
+    // 17. GET CURRENT CREDIT BALANCE BEFORE DEDUCTION
+    // ============================================================
 
-    // CREATE VERIFICATION LOG
+    const creditAmount = 5;
+
+    let account;
+
+    if (refModel === "Agency") {
+      account = await Agency.findById(refid);
+    } else if (refModel === "MasterEmployer") {
+      account = await MasterEmployer.findById(refid);
+    }
+
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: `${refModel} not found`,
+      });
+    }
+
+    // IMPORTANT:
+    // Yahan "credits" aapke actual model ke credit field ka naam hai.
+    // Agar aapke model me field ka naam creditBalance hai,
+    // to account.credits ko account.creditBalance kar dena.
+
+    const balanceBefore = Number(account.credits || 0);
+
+    // INSUFFICIENT CREDIT CHECK
+
+    if (balanceBefore < creditAmount) {
+      return res.status(400).json({
+        success: false,
+        message: "Insufficient credits. Please add credits.",
+        balanceBefore,
+        requiredCredits: creditAmount,
+      });
+    }
+
+    // Expected balance after deduction
+
+    const balanceAfter = balanceBefore - creditAmount;
+
+    // ============================================================
+    // 18. CREATE VERIFICATION LOG
+    // ============================================================
+
     const verification = new EducationVerificationLog({
       profileId,
       educationId,
+
       candidateName: profile.candidateName,
       degree: education.educationName,
       rollNumber: education.rollNumber,
+
       boardId: boardUniversity._id,
       board: boardUniversity.boardName,
+
       year: education.year,
       attachment: education.attachment,
 
       verificationMethod,
+
       status: "Pending",
       result: "Not Verified",
+
       createdBy,
     });
 
     const saveVerification = await verification.save();
 
-    // const verificationUrl = `${process.env.FRONTEND_URL}/EducationVerificationView/${educationId}`;
+    // ============================================================
+    // 19. VERIFICATION EMAIL ID
+    // ============================================================
 
-    const verificationUrl = `${process.env.FRONTEND_URL}/EducationVerificationView/${educationId}/${user._id}`;
+    if (saveVerification.verificationEmailId !== undefined) {
+      saveVerification.verificationEmailId = String(saveVerification._id);
 
-    // EMAIL VERIFICATION
+      await saveVerification.save();
+    }
+
+    // ============================================================
+    // 20. DEDUCT CREDITS
+    // ============================================================
+
+    let creditResult;
+
+    try {
+      creditResult = await deductCredits({
+        refid,
+        refModel,
+        amount: creditAmount,
+      });
+
+      console.log("========== DEDUCT CREDIT RESULT ==========");
+      console.log(creditResult);
+      console.log("===========================================");
+    } catch (creditError) {
+      // Credit deduction fail ho gaya.
+      // Verification record delete kar denge.
+
+      await EducationVerificationLog.findByIdAndDelete(saveVerification._id);
+
+      throw creditError;
+    }
+
+    // ============================================================
+    // 21. FINAL BALANCE VALUES
+    // ============================================================
+
+    // Agar deductCredits() balance return karta hai
+    // to usko priority denge.
+    //
+    // Agar deductCredits() balance return nahi karta,
+    // to upar database se nikale hue values use karenge.
+
+    const finalBalanceBefore = Number(
+      creditResult?.balanceBefore ?? balanceBefore,
+    );
+
+    const finalBalanceAfter = Number(
+      creditResult?.balanceAfter ?? balanceAfter,
+    );
+
+    // Debug
+
+    console.log("========== EDUCATION CREDIT ==========");
+    console.log("Credit Amount:", creditAmount);
+    console.log("Balance Before:", finalBalanceBefore);
+    console.log("Balance After:", finalBalanceAfter);
+    console.log("=======================================");
+
+    // ============================================================
+    // 22. CREATE CREDIT TRANSACTION
+    // ============================================================
+
+    const transactionData = {
+      type: "DEBIT",
+
+      amount: creditAmount,
+
+      balanceBefore: finalBalanceBefore,
+
+      balanceAfter: finalBalanceAfter,
+
+      reason: "Credits deducted for Education Verification",
+
+      action: "EDUCATION_VERIFICATION",
+
+      referenceId: saveVerification._id,
+
+      referenceModel: "EducationVerificationLog",
+
+      createdBy,
+
+      createdDate: new Date(),
+    };
+
+    // ============================================================
+    // 23. FIND EXISTING CREDIT TRANSACTION
+    // ============================================================
+
+    let creditTransaction = await CreditTransaction.findOne({
+      userId: createdBy,
+      refid,
+      refModel,
+    });
+
+    // ============================================================
+    // 24. UPDATE / CREATE CREDIT TRANSACTION
+    // ============================================================
+
+    if (creditTransaction) {
+      creditTransaction.transactions.push(transactionData);
+
+      await creditTransaction.save();
+
+      console.log("Existing CreditTransaction updated:", creditTransaction._id);
+    } else {
+      creditTransaction = await CreditTransaction.create({
+        userId: createdBy,
+
+        refid,
+
+        refModel,
+
+        transactions: [transactionData],
+      });
+
+      console.log("New CreditTransaction created:", creditTransaction._id);
+    }
+
+    // ============================================================
+    // 25. VERIFICATION URL
+    // ============================================================
+
+    const verificationUrl =
+      `${process.env.FRONTEND_URL}/EducationVerificationView/` +
+      `${educationId}/${user._id}`;
+
+    // ============================================================
+    // 26. EMAIL VERIFICATION
+    // ============================================================
+
     if (verificationMethod === "Email") {
       try {
-        // CREATE SMTP TRANSPORTER
         const transporter = nodemailer.createTransport({
           host: process.env.SMTP_HOST,
           port: Number(process.env.SMTP_PORT),
           secure: false,
+
           auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS,
           },
         });
 
-        // EMAIL SUBJECT
         const emailSubject = `Education Verification Request #${saveVerification._id}`;
 
         if (!education.attachment) {
           throw new Error("Education attachment path is missing in database");
         }
+
         const relativeAttachmentPath = education.attachment
           .replace(/^[/\\]+/, "")
           .replace(/\//g, path.sep);
@@ -251,10 +439,11 @@ export const createEducationVerificationLog = async (req, res) => {
           );
         }
 
-        // SEND EMAIL
         const emailInfo = await transporter.sendMail({
           from: process.env.EMAIL_USER,
+
           to: boardUniversity.boardEmail,
+
           subject: emailSubject,
 
           html: `
@@ -271,7 +460,11 @@ export const createEducationVerificationLog = async (req, res) => {
               cellspacing="0"
               style="border-collapse: collapse;"
             >
-              
+
+              <tr>
+                <td><b>Verification ID</b></td>
+                <td>${saveVerification._id}</td>
+              </tr>
 
               <tr>
                 <td><b>Candidate Name</b></td>
@@ -307,39 +500,42 @@ export const createEducationVerificationLog = async (req, res) => {
                 <td><b>Year</b></td>
                 <td>${education.year || "-"}</td>
               </tr>
+
             </table>
 
             <br/>
 
-           <p>
-              You can verify the Education details by replying to this email or by clicking the “ Verify Education ” button below.
-</p>
+            <p>
+              You can verify the Education details by replying to this
+              email or by clicking the "Verify Education" button below.
+            </p>
 
-<br />
+            <br/>
 
-<a
-  href="${verificationUrl}"
-  style="
-    display: inline-block;
-    padding: 12px 24px;
-    background-color: #0d6efd;
-    color: white;
-    text-decoration: none;
-    border-radius: 6px;
-    font-weight: bold;
-  "
->
-  Verify Education
-</a>
+            <a
+              href="${verificationUrl}"
+              style="
+                display: inline-block;
+                padding: 12px 24px;
+                background-color: #0d6efd;
+                color: white;
+                text-decoration: none;
+                border-radius: 6px;
+                font-weight: bold;
+              "
+            >
+              Verify Education
+            </a>
 
-<br />
-<br />
+            <br/>
+            <br/>
 
             <p>
               Thanks,<br/>
               Education Verification Team
             </p>
           `,
+
           attachments: [
             {
               filename: path.basename(attachmentPath),
@@ -348,9 +544,12 @@ export const createEducationVerificationLog = async (req, res) => {
           ],
         });
 
-        // SAVE EMAIL DETAILS IN DATABASE
+        // SAVE EMAIL DETAILS
+
         saveVerification.sentDate = new Date();
+
         saveVerification.status = "Pending";
+
         saveVerification.result = "Not Verified";
 
         saveVerification.remarks =
@@ -363,6 +562,7 @@ export const createEducationVerificationLog = async (req, res) => {
         await saveVerification.save();
       } catch (emailError) {
         saveVerification.status = "Pending";
+
         saveVerification.result = "Not Verified";
 
         saveVerification.remarks =
@@ -374,18 +574,39 @@ export const createEducationVerificationLog = async (req, res) => {
 
         return res.status(500).json({
           success: false,
+
           message:
-            "Verification created, but education verification email could not be sent.",
+            "Education Verification created and credits deducted, but education verification email could not be sent.",
+
           data: saveVerification,
+
+          creditTransaction: {
+            transactionId: creditTransaction._id,
+
+            type: "DEBIT",
+
+            amount: creditAmount,
+
+            balanceBefore: finalBalanceBefore,
+
+            balanceAfter: finalBalanceAfter,
+
+            action: "EDUCATION_VERIFICATION",
+
+            referenceId: saveVerification._id,
+
+            referenceModel: "EducationVerificationLog",
+          },
         });
       }
     }
 
-    // API VERIFICATION
+    // ============================================================
+    // 27. API VERIFICATION
+    // ============================================================
 
     if (verificationMethod === "API") {
       try {
-        // CALL BOARD API
         saveVerification.sentDate = new Date();
 
         const apiResponse = await fetch(boardUniversity.boardApi, {
@@ -398,28 +619,34 @@ export const createEducationVerificationLog = async (req, res) => {
 
           body: JSON.stringify({
             verificationId: String(saveVerification._id),
+
             candidateName: profile.candidateName,
+
             candidateEmail: profile.email,
+
             candidateMobile: profile.mobile,
+
             degree: education.educationName,
+
             board: boardUniversity.boardName,
+
             rollNumber: education.rollNumber,
+
             year: education.year,
           }),
         });
 
-        // CHECK API HTTP STATUS
         if (!apiResponse.ok) {
           throw new Error(`Board API returned status ${apiResponse.status}`);
         }
 
-        // TRY TO READ JSON
         let apiData = null;
 
         try {
           apiData = await apiResponse.json();
         } catch (jsonError) {
           apiData = null;
+
           console.log("Board API JSON parsing failed:", jsonError.message);
         }
 
@@ -441,13 +668,13 @@ export const createEducationVerificationLog = async (req, res) => {
           apiResult = "No Found";
         }
 
-        // SAVE RESULT
-
         saveVerification.result = apiResult;
 
         if (apiResult === "Ok") {
           saveVerification.status = "Verified";
+
           saveVerification.verifiedDate = new Date();
+
           saveVerification.verifiedBy = "Board API";
         }
 
@@ -456,66 +683,722 @@ export const createEducationVerificationLog = async (req, res) => {
 
         await saveVerification.save();
       } catch (apiError) {
-        // SAVE API FAILURE
-
         saveVerification.status = "Pending";
+
         saveVerification.result = "Not Verified";
+
         saveVerification.remarks = `Board API verification failed: ${apiError.message}`;
+
         await saveVerification.save();
 
         return res.status(502).json({
           success: false,
-          message: "Verification created, but board API verification failed.",
+
+          message:
+            "Education Verification created and credits deducted, but board API verification failed.",
+
           data: saveVerification,
+
+          creditTransaction: {
+            transactionId: creditTransaction._id,
+
+            type: "DEBIT",
+
+            amount: creditAmount,
+
+            balanceBefore: finalBalanceBefore,
+
+            balanceAfter: finalBalanceAfter,
+
+            action: "EDUCATION_VERIFICATION",
+
+            referenceId: saveVerification._id,
+
+            referenceModel: "EducationVerificationLog",
+          },
         });
       }
     }
 
-    // FINAL RESPONSE
+    // ============================================================
+    // 28. FINAL RESPONSE
+    // ============================================================
+
     return res.status(201).json({
       success: true,
+
       message:
         verificationMethod === "Email"
           ? "Education Verification created and email sent successfully."
           : "Education Verification created and board API called successfully.",
 
       verificationMethod,
+
       data: saveVerification,
+
+      creditTransaction: {
+        transactionId: creditTransaction._id,
+
+        type: "DEBIT",
+
+        amount: creditAmount,
+
+        balanceBefore: finalBalanceBefore,
+
+        balanceAfter: finalBalanceAfter,
+
+        action: "EDUCATION_VERIFICATION",
+
+        referenceId: saveVerification._id,
+
+        referenceModel: "EducationVerificationLog",
+      },
     });
   } catch (error) {
+    console.error("createEducationVerificationLog error:", error);
+
     // INSUFFICIENT CREDITS
+
     if (error.message === "Insufficient credits") {
       return res.status(400).json({
         success: false,
+
         message: "Insufficient credits. Please add credits.",
       });
     }
 
-    // AGENCY NOT FOUND
-    if (error.message === "Agency not found") {
+    // AGENCY / MASTER EMPLOYER NOT FOUND
+
+    if (
+      error.message === "Agency not found" ||
+      error.message === "MasterEmployer not found"
+    ) {
       return res.status(404).json({
         success: false,
-        message: "Agency not found",
+
+        message: error.message,
       });
     }
 
     // MONGOOSE VALIDATION ERROR
+
     if (error.name === "ValidationError") {
       const errors = Object.values(error.errors).map((e) => e.message);
 
       return res.status(400).json({
         success: false,
+
         message: errors.join(", "),
       });
     }
 
     // INTERNAL SERVER ERROR
+
     return res.status(500).json({
       success: false,
+
       message: error.message || "Internal Server Error",
     });
   }
 };
+
+// export const createEducationVerificationLog = async (req, res) => {
+//   try {
+//     const { profileId, educationId } = req.body;
+
+//     // PROFILE ID VALIDATION
+//     if (!profileId || !mongoose.Types.ObjectId.isValid(profileId)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Valid Profile Id is required",
+//       });
+//     }
+
+//     // EDUCATION ID VALIDATION
+//     if (!educationId || !mongoose.Types.ObjectId.isValid(educationId)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Valid Education Id is required",
+//       });
+//     }
+
+//     // LOGIN USER
+//     const createdBy = req.user?.id || req.user?._id;
+
+//     if (!createdBy) {
+//       return res.status(401).json({
+//         success: false,
+//         message: "User authentication required",
+//       });
+//     }
+
+//     // AGENCY / MASTER EMPLOYER
+//     const refid = req.user?.refid;
+//     const refModel = req.user?.refModel;
+
+//     if (!refid || !refModel) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Agency/MasterEmployer not assigned to user",
+//       });
+//     }
+
+//     // FIND PROFILE
+//     const profile = await ProfileManager.findById(profileId);
+
+//     if (!profile) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Profile not found",
+//       });
+//     }
+
+//     // FIND EDUCATION
+//     const education = profile.educationDetails.id(educationId);
+
+//     if (!education) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Education record not found",
+//       });
+//     }
+
+//     // ATTACHMENT CHECK
+//     const attachment = education.attachment;
+
+//     if (!attachment) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Education attachment not found",
+//       });
+//     }
+
+//     // EDUCATION BOARD ID CHECK
+//     if (!education.boardId) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Board Id not found in education details",
+//       });
+//     }
+
+//     // FIND BOARD UNIVERSITY USER
+//     const user = await User.findOne({
+//       refid: education.boardId,
+//       refModel: "BoardUniversity",
+//       isActive: true,
+//     });
+
+//     if (!user) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "User not found for this Board University",
+//       });
+//     }
+
+//     // EDUCATION YEAR CHECK
+//     if (!education.year) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Education year is required",
+//       });
+//     }
+
+//     // FIND BOARD / UNIVERSITY
+//     const boardUniversity = await BoardUniversity.findById(education.boardId);
+
+//     if (!boardUniversity) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Board University not found",
+//       });
+//     }
+
+//     // BOARD YEAR CHECK
+//     if (!boardUniversity.year) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Board verification year is not configured",
+//       });
+//     }
+
+//     // DECIDE VERIFICATION METHOD
+//     let verificationMethod = "";
+
+//     if (education.year < boardUniversity.year) {
+//       verificationMethod = "Email";
+//     } else {
+//       verificationMethod = "API";
+//     }
+
+//     // EMAIL VALIDATION
+//     if (verificationMethod === "Email") {
+//       if (!boardUniversity.boardEmail) {
+//         return res.status(400).json({
+//           success: false,
+//           message:
+//             `Email verification is required for year ${education.year}, ` +
+//             `but board email is not available for ${boardUniversity.boardName}`,
+//         });
+//       }
+//     }
+
+//     // API VALIDATION
+//     if (verificationMethod === "API") {
+//       if (!boardUniversity.boardApi) {
+//         if (boardUniversity.boardEmail) {
+//           verificationMethod = "Email";
+//         } else {
+//           return res.status(400).json({
+//             success: false,
+//             message:
+//               `API verification is required for year ${education.year}, ` +
+//               `but board API and board email are not available for ${boardUniversity.boardName}`,
+//           });
+//         }
+//       }
+//     }
+
+//     // DUPLICATE CHECK
+//     const alreadyExist = await EducationVerificationLog.findOne({
+//       profileId,
+//       educationId,
+//     });
+
+//     if (alreadyExist) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Education Verification already created.",
+//       });
+//     }
+
+//     // CREATE VERIFICATION LOG FIRST
+
+//     const verification = new EducationVerificationLog({
+//       profileId,
+//       educationId,
+//       candidateName: profile.candidateName,
+//       degree: education.educationName,
+//       rollNumber: education.rollNumber,
+//       boardId: boardUniversity._id,
+//       board: boardUniversity.boardName,
+//       year: education.year,
+//       attachment: education.attachment,
+
+//       verificationMethod,
+//       status: "Pending",
+//       result: "Not Verified",
+//       createdBy,
+//     });
+
+//     const saveVerification = await verification.save();
+
+//     // DEDUCT CREDITS
+
+//     const creditAmount = 5;
+
+//     let creditResult;
+
+//     try {
+//       creditResult = await deductCredits({
+//         refid,
+//         refModel,
+//         amount: creditAmount,
+//       });
+//     } catch (creditError) {
+//       // Credit deduction failed,
+//       // so remove created verification record
+//       await EducationVerificationLog.findByIdAndDelete(saveVerification._id);
+
+//       throw creditError;
+//     }
+
+//     // CREATE CREDIT TRANSACTION - DEBIT
+
+//     const transactionData = {
+//       type: "DEBIT",
+//       amount: creditAmount,
+
+//       balanceBefore: creditResult.balanceBefore,
+//       balanceAfter: creditResult.balanceAfter,
+
+//       reason: "Credits deducted for Education Verification",
+
+//       action: "EDUCATION_VERIFICATION",
+
+//       referenceId: saveVerification._id,
+//       referenceModel: "EducationVerificationLog",
+
+//       createdBy,
+//       createdDate: new Date(),
+//     };
+
+//     // FIND EXISTING CREDIT TRANSACTION
+
+//     let creditTransaction = await CreditTransaction.findOne({
+//       userId: createdBy,
+//       refid,
+//       refModel,
+//     });
+
+//     // UPDATE OR CREATE CREDIT TRANSACTION
+
+//     if (creditTransaction) {
+//       creditTransaction.transactions.push(transactionData);
+
+//       await creditTransaction.save();
+//     } else {
+//       creditTransaction = await CreditTransaction.create({
+//         userId: createdBy,
+//         refid,
+//         refModel,
+//         transactions: [transactionData],
+//       });
+//     }
+
+//     // VERIFICATION URL
+
+//     const verificationUrl =
+//       `${process.env.FRONTEND_URL}/EducationVerificationView/` +
+//       `${educationId}/${user._id}`;
+
+//     // EMAIL VERIFICATION
+
+//     if (verificationMethod === "Email") {
+//       try {
+//         // CREATE SMTP TRANSPORTER
+//         const transporter = nodemailer.createTransport({
+//           host: process.env.SMTP_HOST,
+//           port: Number(process.env.SMTP_PORT),
+//           secure: false,
+//           auth: {
+//             user: process.env.EMAIL_USER,
+//             pass: process.env.EMAIL_PASS,
+//           },
+//         });
+
+//         // EMAIL SUBJECT
+//         const emailSubject = `Education Verification Request #${saveVerification._id}`;
+
+//         if (!education.attachment) {
+//           throw new Error("Education attachment path is missing in database");
+//         }
+
+//         const relativeAttachmentPath = education.attachment
+//           .replace(/^[/\\]+/, "")
+//           .replace(/\//g, path.sep);
+
+//         const attachmentPath = path.join(process.cwd(), relativeAttachmentPath);
+
+//         if (!fs.existsSync(attachmentPath)) {
+//           throw new Error(
+//             `Education attachment file not found on server: ${attachmentPath}`,
+//           );
+//         }
+
+//         // SEND EMAIL
+//         const emailInfo = await transporter.sendMail({
+//           from: process.env.EMAIL_USER,
+//           to: boardUniversity.boardEmail,
+//           subject: emailSubject,
+
+//           html: `
+//             <h2>Hello ${boardUniversity.boardName},</h2>
+
+//             <p>
+//               A new education verification request has been submitted
+//               for the following candidate.
+//             </p>
+
+//             <table
+//               border="1"
+//               cellpadding="8"
+//               cellspacing="0"
+//               style="border-collapse: collapse;"
+//             >
+//               <tr>
+//                 <td><b>Candidate Name</b></td>
+//                 <td>${profile.candidateName}</td>
+//               </tr>
+
+//               <tr>
+//                 <td><b>Candidate Email</b></td>
+//                 <td>${profile.email}</td>
+//               </tr>
+
+//               <tr>
+//                 <td><b>Candidate Mobile</b></td>
+//                 <td>${profile.mobile}</td>
+//               </tr>
+
+//               <tr>
+//                 <td><b>Degree</b></td>
+//                 <td>${education.educationName || "-"}</td>
+//               </tr>
+
+//               <tr>
+//                 <td><b>Board</b></td>
+//                 <td>${boardUniversity.boardName}</td>
+//               </tr>
+
+//               <tr>
+//                 <td><b>Roll Number</b></td>
+//                 <td>${education.rollNumber || "-"}</td>
+//               </tr>
+
+//               <tr>
+//                 <td><b>Year</b></td>
+//                 <td>${education.year || "-"}</td>
+//               </tr>
+//             </table>
+
+//             <br/>
+
+//             <p>
+//               You can verify the Education details by replying to this
+//               email or by clicking the "Verify Education" button below.
+//             </p>
+
+//             <br />
+
+//             <a
+//               href="${verificationUrl}"
+//               style="
+//                 display: inline-block;
+//                 padding: 12px 24px;
+//                 background-color: #0d6efd;
+//                 color: white;
+//                 text-decoration: none;
+//                 border-radius: 6px;
+//                 font-weight: bold;
+//               "
+//             >
+//               Verify Education
+//             </a>
+
+//             <br />
+//             <br />
+
+//             <p>
+//               Thanks,<br/>
+//               Education Verification Team
+//             </p>
+//           `,
+
+//           attachments: [
+//             {
+//               filename: path.basename(attachmentPath),
+//               path: attachmentPath,
+//             },
+//           ],
+//         });
+
+//         // SAVE EMAIL DETAILS
+//         saveVerification.sentDate = new Date();
+//         saveVerification.status = "Pending";
+//         saveVerification.result = "Not Verified";
+
+//         saveVerification.remarks =
+//           `Verification request sent successfully by email. ` +
+//           `To: ${boardUniversity.boardEmail}. ` +
+//           `Subject: ${emailSubject}. ` +
+//           `Message ID: ${emailInfo.messageId}. ` +
+//           `SMTP Response: ${emailInfo.response || "N/A"}`;
+
+//         await saveVerification.save();
+//       } catch (emailError) {
+//         saveVerification.status = "Pending";
+//         saveVerification.result = "Not Verified";
+
+//         saveVerification.remarks =
+//           `Email sending failed. ` +
+//           `To: ${boardUniversity.boardEmail}. ` +
+//           `Error: ${emailError.message}`;
+
+//         await saveVerification.save();
+
+//         return res.status(500).json({
+//           success: false,
+//           message:
+//             "Verification created and credits deducted, but education verification email could not be sent.",
+
+//           data: saveVerification,
+
+//           creditTransaction: {
+//             transactionId: creditTransaction._id,
+//             type: "DEBIT",
+//             amount: creditAmount,
+//             balanceBefore: creditResult.balanceBefore,
+//             balanceAfter: creditResult.balanceAfter,
+//           },
+//         });
+//       }
+//     }
+
+//     // API VERIFICATION
+
+//     if (verificationMethod === "API") {
+//       try {
+//         // CALL BOARD API
+//         saveVerification.sentDate = new Date();
+
+//         const apiResponse = await fetch(boardUniversity.boardApi, {
+//           method: "POST",
+
+//           headers: {
+//             "Content-Type": "application/json",
+//             Accept: "application/json",
+//           },
+
+//           body: JSON.stringify({
+//             verificationId: String(saveVerification._id),
+//             candidateName: profile.candidateName,
+//             candidateEmail: profile.email,
+//             candidateMobile: profile.mobile,
+//             degree: education.educationName,
+//             board: boardUniversity.boardName,
+//             rollNumber: education.rollNumber,
+//             year: education.year,
+//           }),
+//         });
+
+//         // CHECK API HTTP STATUS
+//         if (!apiResponse.ok) {
+//           throw new Error(`Board API returned status ${apiResponse.status}`);
+//         }
+
+//         // TRY TO READ JSON
+//         let apiData = null;
+
+//         try {
+//           apiData = await apiResponse.json();
+//         } catch (jsonError) {
+//           apiData = null;
+
+//           console.log("Board API JSON parsing failed:", jsonError.message);
+//         }
+
+//         let apiResult = "Not Verified";
+
+//         if (
+//           apiData?.result === "Ok" ||
+//           apiData?.status === "Verified" ||
+//           apiData?.verified === true
+//         ) {
+//           apiResult = "Ok";
+//         }
+
+//         if (
+//           apiData?.result === "No Found" ||
+//           apiData?.status === "No Found" ||
+//           apiData?.found === false
+//         ) {
+//           apiResult = "No Found";
+//         }
+
+//         // SAVE RESULT
+//         saveVerification.result = apiResult;
+
+//         if (apiResult === "Ok") {
+//           saveVerification.status = "Verified";
+//           saveVerification.verifiedDate = new Date();
+//           saveVerification.verifiedBy = "Board API";
+//         }
+
+//         saveVerification.remarks =
+//           "Education verification API request completed.";
+
+//         await saveVerification.save();
+//       } catch (apiError) {
+//         // SAVE API FAILURE
+//         saveVerification.status = "Pending";
+//         saveVerification.result = "Not Verified";
+
+//         saveVerification.remarks = `Board API verification failed: ${apiError.message}`;
+
+//         await saveVerification.save();
+
+//         return res.status(502).json({
+//           success: false,
+//           message:
+//             "Verification created and credits deducted, but board API verification failed.",
+
+//           data: saveVerification,
+
+//           creditTransaction: {
+//             transactionId: creditTransaction._id,
+//             type: "DEBIT",
+//             amount: creditAmount,
+//             balanceBefore: creditResult.balanceBefore,
+//             balanceAfter: creditResult.balanceAfter,
+//           },
+//         });
+//       }
+//     }
+
+//     // FINAL RESPONSE
+
+//     return res.status(201).json({
+//       success: true,
+
+//       message:
+//         verificationMethod === "Email"
+//           ? "Education Verification created and email sent successfully."
+//           : "Education Verification created and board API called successfully.",
+
+//       verificationMethod,
+
+//       data: saveVerification,
+
+//       creditTransaction: {
+//         transactionId: creditTransaction._id,
+//         type: "DEBIT",
+//         amount: creditAmount,
+//         balanceBefore: creditResult.balanceBefore,
+//         balanceAfter: creditResult.balanceAfter,
+//         action: "EDUCATION_VERIFICATION",
+//         referenceId: saveVerification._id,
+//         referenceModel: "EducationVerificationLog",
+//       },
+//     });
+//   } catch (error) {
+//     // INSUFFICIENT CREDITS
+//     if (error.message === "Insufficient credits") {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Insufficient credits. Please add credits.",
+//       });
+//     }
+
+//     // AGENCY NOT FOUND
+//     if (
+//       error.message === "Agency not found" ||
+//       error.message === "MasterEmployer not found"
+//     ) {
+//       return res.status(404).json({
+//         success: false,
+//         message: error.message,
+//       });
+//     }
+
+//     // MONGOOSE VALIDATION ERROR
+//     if (error.name === "ValidationError") {
+//       const errors = Object.values(error.errors).map((e) => e.message);
+
+//       return res.status(400).json({
+//         success: false,
+//         message: errors.join(", "),
+//       });
+//     }
+
+//     // INTERNAL SERVER ERROR
+//     console.error("createEducationVerificationLog error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: error.message || "Internal Server Error",
+//     });
+//   }
+// };
 
 export const getEducationVerificationLogs = async (req, res) => {
   try {
@@ -787,18 +1670,57 @@ export const updateEducationVerificationLog = async (req, res) => {
   }
 };
 
+// export const getEducationVerificationLogByEducationId = async (req, res) => {
+//   try {
+//     const { educationId } = req.params;
+//     const createdBy = req.user?.id;
+
+//     // Authentication check
+//     if (!createdBy) {
+//       return res.status(401).json({
+//         success: false,
+//         message: "User authentication required",
+//       });
+//     }
+
+//     // educationId check
+//     if (!educationId) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "educationId is required",
+//       });
+//     }
+
+//     // Education Verification Logs
+//     const verificationList = await EducationVerificationLog.find({
+//       educationId,
+//       createdBy,
+//     })
+//       .populate("profileId")
+//       .populate("boardId")
+//       .populate("createdBy", "name email")
+//       .sort({ createdDate: -1 })
+//       .lean();
+
+//     return res.status(200).json({
+//       success: true,
+//       count: verificationList.length,
+//       data: verificationList,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching Education Verification Log:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Error fetching Education Verification Log",
+//       error: error.message,
+//     });
+//   }
+// };
+
 export const getEducationVerificationLogByEducationId = async (req, res) => {
   try {
     const { educationId } = req.params;
-    const createdBy = req.user?.id;
-
-    // Authentication check
-    if (!createdBy) {
-      return res.status(401).json({
-        success: false,
-        message: "User authentication required",
-      });
-    }
 
     // educationId check
     if (!educationId) {
@@ -811,7 +1733,6 @@ export const getEducationVerificationLogByEducationId = async (req, res) => {
     // Education Verification Logs
     const verificationList = await EducationVerificationLog.find({
       educationId,
-      createdBy,
     })
       .populate("profileId")
       .populate("boardId")
@@ -1733,9 +2654,7 @@ export const verifyEducationVerificationNew = async (req, res) => {
     const { id } = req.params;
     const { remarks } = req.body;
 
-    // =====================================================
     // 1. VALIDATE ID
-    // =====================================================
 
     if (!id) {
       return res.status(400).json({
@@ -1751,9 +2670,7 @@ export const verifyEducationVerificationNew = async (req, res) => {
       });
     }
 
-    // =====================================================
     // 2. GET LOGGED-IN USER
-    // =====================================================
 
     const userId = req.user?._id || req.user?.id;
 
@@ -1764,19 +2681,15 @@ export const verifyEducationVerificationNew = async (req, res) => {
       });
     }
 
-    // =====================================================
     // 3. FIND EDUCATION VERIFICATION
     // IMPORTANT:
     // createdBy condition intentionally NOT used
-    // =====================================================
 
     const verification = await EducationVerificationLog.findById(id);
 
     console.log("VERIFICATION FOUND:", verification);
 
-    // =====================================================
     // 4. NOT FOUND
-    // =====================================================
 
     if (!verification) {
       return res.status(404).json({
@@ -1785,9 +2698,7 @@ export const verifyEducationVerificationNew = async (req, res) => {
       });
     }
 
-    // =====================================================
     // 5. ALREADY VERIFIED
-    // =====================================================
 
     if (String(verification.status || "").toLowerCase() === "verified") {
       return res.status(400).json({
@@ -1797,9 +2708,7 @@ export const verifyEducationVerificationNew = async (req, res) => {
       });
     }
 
-    // =====================================================
     // 6. ALREADY REJECTED
-    // =====================================================
 
     if (String(verification.status || "").toLowerCase() === "rejected") {
       return res.status(400).json({
@@ -1809,9 +2718,7 @@ export const verifyEducationVerificationNew = async (req, res) => {
       });
     }
 
-    // =====================================================
     // 7. UPDATE VERIFICATION
-    // =====================================================
 
     const now = new Date();
 
@@ -1824,17 +2731,13 @@ export const verifyEducationVerificationNew = async (req, res) => {
     verification.verifiedDate = now;
     verification.updatedDate = now;
 
-    // =====================================================
     // 8. REMARKS
-    // =====================================================
 
     if (remarks !== undefined && remarks !== null) {
       verification.remarks = String(remarks).trim();
     }
 
-    // =====================================================
     // 9. SAVE
-    // =====================================================
 
     await verification.save();
 
@@ -1846,9 +2749,7 @@ export const verifyEducationVerificationNew = async (req, res) => {
     console.log("VERIFIED BY:", verification.verifiedBy);
     console.log("=================================");
 
-    // =====================================================
     // 10. SUCCESS RESPONSE
-    // =====================================================
 
     return res.status(200).json({
       success: true,
@@ -1874,9 +2775,7 @@ export const rejectEducationVerificationNew = async (req, res) => {
     const { id } = req.params;
     const { remarks } = req.body;
 
-    // =====================================================
     // 1. VALIDATE ID
-    // =====================================================
 
     if (!id) {
       return res.status(400).json({
@@ -1892,9 +2791,7 @@ export const rejectEducationVerificationNew = async (req, res) => {
       });
     }
 
-    // =====================================================
     // 2. GET LOGGED-IN USER
-    // =====================================================
 
     const userId = req.user?._id || req.user?.id;
 
@@ -1905,9 +2802,7 @@ export const rejectEducationVerificationNew = async (req, res) => {
       });
     }
 
-    // =====================================================
     // 3. VALIDATE REMARKS
-    // =====================================================
 
     if (remarks === undefined || remarks === null || !String(remarks).trim()) {
       return res.status(400).json({
@@ -1916,20 +2811,16 @@ export const rejectEducationVerificationNew = async (req, res) => {
       });
     }
 
-    // =====================================================
     // 4. FIND EDUCATION VERIFICATION
     //
     // IMPORTANT:
     // createdBy condition intentionally removed
-    // =====================================================
 
     const verification = await EducationVerificationLog.findById(id);
 
     console.log("VERIFICATION FOUND:", verification);
 
-    // =====================================================
     // 5. NOT FOUND
-    // =====================================================
 
     if (!verification) {
       return res.status(404).json({
@@ -1938,9 +2829,7 @@ export const rejectEducationVerificationNew = async (req, res) => {
       });
     }
 
-    // =====================================================
     // 6. ALREADY VERIFIED CHECK
-    // =====================================================
 
     if (String(verification.status || "").toLowerCase() === "verified") {
       return res.status(400).json({
@@ -1950,9 +2839,7 @@ export const rejectEducationVerificationNew = async (req, res) => {
       });
     }
 
-    // =====================================================
     // 7. ALREADY REJECTED CHECK
-    // =====================================================
 
     if (String(verification.status || "").toLowerCase() === "rejected") {
       return res.status(400).json({
@@ -1962,9 +2849,7 @@ export const rejectEducationVerificationNew = async (req, res) => {
       });
     }
 
-    // =====================================================
     // 8. UPDATE REJECTION
-    // =====================================================
 
     const now = new Date();
 
@@ -1981,9 +2866,7 @@ export const rejectEducationVerificationNew = async (req, res) => {
 
     verification.respondedDate = now;
 
-    // =====================================================
     // 9. SAVE
-    // =====================================================
 
     await verification.save();
 
@@ -1996,9 +2879,7 @@ export const rejectEducationVerificationNew = async (req, res) => {
     console.log("REMARKS:", verification.remarks);
     console.log("=================================");
 
-    // =====================================================
     // 10. SUCCESS RESPONSE
-    // =====================================================
 
     return res.status(200).json({
       success: true,

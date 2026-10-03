@@ -22,4 +22,6 @@ build/
 
 # Temporary files
 *.tmp
-*.temp
+*.tempuploads/
+
+uploads/

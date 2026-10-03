@@ -136,57 +136,6 @@ export const getUsers = async (req, res) => {
   }
 };
 
-// export const getUserById = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-
-//     if (!mongoose.Types.ObjectId.isValid(id)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid User Id",
-//       });
-//     }
-
-//     const user = await User.findById(id)
-//       .populate("createby", "name email")
-//       .populate("updateby", "name email");
-
-//     if (!user) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "User not found",
-//       });
-//     }
-
-//     const data = {
-//       id: user._id,
-//       name: user.name,
-//       email: user.email,
-//       mobileNo: user.mobileNo,
-//       UserRole: user.UserRole,
-//       refid: user.refid,
-//       isActive: user.isActive,
-//       createby: user.createby,
-//       updateby: user.updateby,
-//       createdate: user.createdate,
-//       updatedate: user.updatedate,
-//     };
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "User fetched successfully",
-//       data,
-//     });
-//   } catch (error) {
-//     console.log(error);
-
-//     return res.status(500).json({
-//       success: false,
-//       message: error.message,
-//     });
-//   }
-// };
-
 export const getUserById = async (req, res) => {
   try {
     const { id } = req.params;

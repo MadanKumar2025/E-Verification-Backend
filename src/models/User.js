@@ -34,7 +34,7 @@ const userSchema = new mongoose.Schema({
 
   refModel: {
     type: String,
-    enum: ["Agency", "MasterEmployer", "BoardUniversity"],
+    enum: ["Agency", "Employee", "BoardUniversity"],
     required: true,
   },
 

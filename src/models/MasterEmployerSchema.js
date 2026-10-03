@@ -90,32 +90,9 @@ const masterEmployerSchema = new mongoose.Schema({
     trim: true,
   },
 
-  subscriptionId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Subscription",
-    validate: {
-      validator: function (value) {
-        if (this.credits !== undefined && this.credits !== null) {
-          return value !== undefined && value !== null;
-        }
-        return true;
-      },
-      message: "Subscription ID is required when credits are provided",
-    },
-  },
-
   credits: {
     type: Number,
     default: undefined,
-    validate: {
-      validator: function (value) {
-        if (this.subscriptionId) {
-          return value !== undefined && value !== null;
-        }
-        return true;
-      },
-      message: "Credits are required when subscriptionId is provided",
-    },
   },
 
   isApproved: {

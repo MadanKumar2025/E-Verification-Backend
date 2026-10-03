@@ -16,6 +16,9 @@ import EmploymentVerificationLogRoutes from "./routes/EmploymentVerificationLogR
 import BoardUniversityRoutes from "./routes/BoardUniversityRoutes.js";
 import CountingRoutes from "./routes/CountingRoutes.js";
 import partnersRoutes from "./routes/partnersRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
+import creditTransactionRoutes from "./routes/creditTransactionRoutes.js";
+import VerificationLogsRoutes from "./routes/VerificationLogsRoutes.js";
 
 import cors from "cors";
 import path from "path";
@@ -49,6 +52,9 @@ app.use("/api/EmploymentVerificationLog", EmploymentVerificationLogRoutes);
 app.use("/api/BoardUniversity", BoardUniversityRoutes);
 app.use("/api/CountingRoutes", CountingRoutes);
 app.use("/api/partners", partnersRoutes);
+app.use("/api/payment", paymentRoutes);
+app.use("/api/creditTransaction", creditTransactionRoutes);
+app.use("/api/VerificationLogs", VerificationLogsRoutes);
 
 app.use("/api/AdminMenuMasterRoutes", AdminMenuMasterRoutes);
 app.use("/api/UserPermissionsRoutes", UserPermissionsRoutes);

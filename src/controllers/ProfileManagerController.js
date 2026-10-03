@@ -432,6 +432,293 @@ export const getProfileManagers = async (req, res) => {
   }
 };
 
+export const getProfileList = async (req, res) => {
+  try {
+    const { createdBy } = req.query;
+
+    const filter = {};
+
+    if (createdBy) {
+      filter.createdBy = createdBy;
+    }
+
+    const profileList = await ProfileManager.find(filter)
+      .populate("educationDetails.boardId")
+      .populate("employmentDetails.employerId")
+      .sort({ createdDate: -1 });
+
+    const data = profileList.map((profile) => ({
+      id: profile._id,
+      candidateName: profile.candidateName,
+      mobile: profile.mobile,
+      email: profile.email,
+      permanentAddress: profile.permanentAddress,
+      city: profile.city,
+      state: profile.state,
+      country: profile.country,
+      panCardNumber: profile.panCardNumber,
+      aadharCardNumber: profile.aadharCardNumber,
+      dateOfBirth: profile.dateOfBirth,
+      educationDetails: profile.educationDetails,
+      employmentDetails: profile.employmentDetails,
+      isActive: profile.isActive,
+      createdDate: profile.createdDate,
+      updatedDate: profile.updatedDate,
+      createdBy: profile.createdBy,
+
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile list fetched successfully",
+      data,
+    });
+  } catch (error) {
+    console.error("Get Profile List Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch profile list",
+      error: error.message,
+    });
+  }
+};
+
+// export const getProfileManagerById = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     // PROFILE ID VALIDATION
+
+//     if (!mongoose.Types.ObjectId.isValid(id)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid Profile Manager Id",
+//       });
+//     }
+
+//     // LOGGED IN USER
+
+//     const createdBy = req.user?.id || null;
+
+//     if (!createdBy) {
+//       return res.status(401).json({
+//         success: false,
+//         message: "User authentication required",
+//       });
+//     }
+
+//     // FIND PROFILE
+
+//     const profile = await ProfileManager.findOne({
+//       _id: id,
+//       createdBy,
+//     });
+
+//     if (!profile) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Profile Manager not found",
+//       });
+//     }
+
+//     // GET EDUCATION IDS
+
+//     const educationIds = (profile.educationDetails || [])
+//       .filter((education) => education?._id)
+//       .map((education) => education._id);
+
+//     // GET EMPLOYMENT IDS
+
+//     const employmentIds = (profile.employmentDetails || [])
+//       .filter((employment) => employment?._id)
+//       .map((employment) => employment._id);
+
+//     // EDUCATION VERIFICATION LOG
+//     //
+//     // IMPORTANT:
+//     //
+//     // Agar profileId + educationId match hai,
+//     // sirf wahi education locked hogi.
+
+//     let protectedEducationIds = new Set();
+
+//     if (educationIds.length > 0) {
+//       const educationVerificationLogs = await EducationVerificationLog.find({
+//         profileId: profile._id,
+//         educationId: {
+//           $in: educationIds,
+//         },
+//       })
+//         .select("educationId")
+//         .lean();
+
+//       protectedEducationIds = new Set(
+//         educationVerificationLogs
+//           .filter((log) => log?.educationId)
+//           .map((log) => String(log.educationId)),
+//       );
+//     }
+
+//     // EMPLOYMENT VERIFICATION LOG
+//     //
+//     // IMPORTANT:
+//     //
+//     // Agar profileId + employmentDetailsId match hai,
+//     // sirf wahi employment locked hogi.
+
+//     let protectedEmploymentIds = new Set();
+
+//     if (employmentIds.length > 0) {
+//       const employmentVerificationLogs = await EmploymentVerificationLog.find({
+//         profileId: profile._id,
+//         employmentDetailsId: {
+//           $in: employmentIds,
+//         },
+//       })
+//         .select("employmentDetailsId")
+//         .lean();
+
+//       protectedEmploymentIds = new Set(
+//         employmentVerificationLogs
+//           .filter((log) => log?.employmentDetailsId)
+//           .map((log) => String(log.employmentDetailsId)),
+//       );
+//     }
+
+//     // PROFILE LEVEL VERIFICATION
+//     //
+//     // Candidate Name + DOB ke liye:
+//     //
+//     // Agar EducationVerificationLog ya
+//     // EmploymentVerificationLog mein profileId match
+//     // ho gaya hai, dono fields locked rahengi.
+
+//     const educationProfileVerificationExists =
+//       await EducationVerificationLog.exists({
+//         profileId: profile._id,
+//       });
+
+//     const employmentProfileVerificationExists =
+//       await EmploymentVerificationLog.exists({
+//         profileId: profile._id,
+//       });
+
+//     const isCandidateInfoLocked =
+//       !!educationProfileVerificationExists ||
+//       !!employmentProfileVerificationExists;
+
+//     // EDUCATION DETAILS WITH LOCK STATUS
+
+//     const educationDetails = (profile.educationDetails || []).map(
+//       (education) => {
+//         const educationObject = education.toObject
+//           ? education.toObject()
+//           : { ...education };
+
+//         const educationId = education?._id ? String(education._id) : null;
+
+//         return {
+//           ...educationObject,
+
+//           // Frontend ke liye
+//           isVerifiedLocked: educationId
+//             ? protectedEducationIds.has(educationId)
+//             : false,
+//         };
+//       },
+//     );
+
+//     // EMPLOYMENT DETAILS WITH LOCK STATUS
+
+//     const employmentDetails = (profile.employmentDetails || []).map(
+//       (employment) => {
+//         const employmentObject = employment.toObject
+//           ? employment.toObject()
+//           : { ...employment };
+
+//         const employmentId = employment?._id ? String(employment._id) : null;
+
+//         return {
+//           ...employmentObject,
+
+//           // Frontend ke liye
+//           isVerifiedLocked: employmentId
+//             ? protectedEmploymentIds.has(employmentId)
+//             : false,
+//         };
+//       },
+//     );
+
+//     // RESPONSE DATA
+
+//     const data = {
+//       id: profile._id,
+
+//       // -------------------------------------------------------
+//       // CANDIDATE INFO
+//       // -------------------------------------------------------
+
+//       candidateName: profile.candidateName,
+
+//       dateOfBirth: profile.dateOfBirth,
+
+//       // -------------------------------------------------------
+//       // EDITABLE FIELDS
+//       // -------------------------------------------------------
+
+//       mobile: profile.mobile,
+//       email: profile.email,
+//       permanentAddress: profile.permanentAddress,
+//       city: profile.city,
+//       state: profile.state,
+//       country: profile.country,
+//       panCardNumber: profile.panCardNumber,
+//       aadharCardNumber: profile.aadharCardNumber,
+//       isActive: profile.isActive,
+
+//       // -------------------------------------------------------
+//       // DETAILS
+//       // -------------------------------------------------------
+
+//       educationDetails,
+//       employmentDetails,
+
+//       // -------------------------------------------------------
+//       // VERIFICATION STATUS
+//       // -------------------------------------------------------
+
+//       isCandidateInfoLocked,
+
+//       // Optional separate status
+//       hasEducationVerification: !!educationProfileVerificationExists,
+
+//       hasEmploymentVerification: !!employmentProfileVerificationExists,
+
+//       // -------------------------------------------------------
+//       // DATES
+//       // -------------------------------------------------------
+
+//       createdDate: profile.createdDate,
+//       updatedDate: profile.updatedDate,
+//     };
+
+//     // SUCCESS RESPONSE
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Profile Manager fetched successfully",
+//       data,
+//     });
+//   } catch (error) {
+//     console.error("Get Profile Manager By Id Error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: error.message || "Internal Server Error",
+//     });
+//   }
+// };
 export const getProfileManagerById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -445,22 +732,11 @@ export const getProfileManagerById = async (req, res) => {
       });
     }
 
-    // LOGGED IN USER
-
-    const createdBy = req.user?.id || null;
-
-    if (!createdBy) {
-      return res.status(401).json({
-        success: false,
-        message: "User authentication required",
-      });
-    }
-
-    // FIND PROFILE
+    // FIND PROFILE BY ID ONLY
+    // createdBy ka koi filter nahi hai
 
     const profile = await ProfileManager.findOne({
       _id: id,
-      createdBy,
     });
 
     if (!profile) {
@@ -483,23 +759,19 @@ export const getProfileManagerById = async (req, res) => {
       .map((employment) => employment._id);
 
     // EDUCATION VERIFICATION LOG
-    //
-    // IMPORTANT:
-    //
-    // Agar profileId + educationId match hai,
-    // sirf wahi education locked hogi.
 
     let protectedEducationIds = new Set();
 
     if (educationIds.length > 0) {
-      const educationVerificationLogs = await EducationVerificationLog.find({
-        profileId: profile._id,
-        educationId: {
-          $in: educationIds,
-        },
-      })
-        .select("educationId")
-        .lean();
+      const educationVerificationLogs =
+        await EducationVerificationLog.find({
+          profileId: profile._id,
+          educationId: {
+            $in: educationIds,
+          },
+        })
+          .select("educationId")
+          .lean();
 
       protectedEducationIds = new Set(
         educationVerificationLogs
@@ -509,23 +781,19 @@ export const getProfileManagerById = async (req, res) => {
     }
 
     // EMPLOYMENT VERIFICATION LOG
-    //
-    // IMPORTANT:
-    //
-    // Agar profileId + employmentDetailsId match hai,
-    // sirf wahi employment locked hogi.
 
     let protectedEmploymentIds = new Set();
 
     if (employmentIds.length > 0) {
-      const employmentVerificationLogs = await EmploymentVerificationLog.find({
-        profileId: profile._id,
-        employmentDetailsId: {
-          $in: employmentIds,
-        },
-      })
-        .select("employmentDetailsId")
-        .lean();
+      const employmentVerificationLogs =
+        await EmploymentVerificationLog.find({
+          profileId: profile._id,
+          employmentDetailsId: {
+            $in: employmentIds,
+          },
+        })
+          .select("employmentDetailsId")
+          .lean();
 
       protectedEmploymentIds = new Set(
         employmentVerificationLogs
@@ -535,12 +803,6 @@ export const getProfileManagerById = async (req, res) => {
     }
 
     // PROFILE LEVEL VERIFICATION
-    //
-    // Candidate Name + DOB ke liye:
-    //
-    // Agar EducationVerificationLog ya
-    // EmploymentVerificationLog mein profileId match
-    // ho gaya hai, dono fields locked rahengi.
 
     const educationProfileVerificationExists =
       await EducationVerificationLog.exists({
@@ -556,7 +818,7 @@ export const getProfileManagerById = async (req, res) => {
       !!educationProfileVerificationExists ||
       !!employmentProfileVerificationExists;
 
-    // EDUCATION DETAILS WITH LOCK STATUS
+    // EDUCATION DETAILS
 
     const educationDetails = (profile.educationDetails || []).map(
       (education) => {
@@ -564,12 +826,13 @@ export const getProfileManagerById = async (req, res) => {
           ? education.toObject()
           : { ...education };
 
-        const educationId = education?._id ? String(education._id) : null;
+        const educationId = education?._id
+          ? String(education._id)
+          : null;
 
         return {
           ...educationObject,
 
-          // Frontend ke liye
           isVerifiedLocked: educationId
             ? protectedEducationIds.has(educationId)
             : false,
@@ -577,7 +840,7 @@ export const getProfileManagerById = async (req, res) => {
       },
     );
 
-    // EMPLOYMENT DETAILS WITH LOCK STATUS
+    // EMPLOYMENT DETAILS
 
     const employmentDetails = (profile.employmentDetails || []).map(
       (employment) => {
@@ -585,12 +848,13 @@ export const getProfileManagerById = async (req, res) => {
           ? employment.toObject()
           : { ...employment };
 
-        const employmentId = employment?._id ? String(employment._id) : null;
+        const employmentId = employment?._id
+          ? String(employment._id)
+          : null;
 
         return {
           ...employmentObject,
 
-          // Frontend ke liye
           isVerifiedLocked: employmentId
             ? protectedEmploymentIds.has(employmentId)
             : false,
@@ -603,17 +867,12 @@ export const getProfileManagerById = async (req, res) => {
     const data = {
       id: profile._id,
 
-      // -------------------------------------------------------
       // CANDIDATE INFO
-      // -------------------------------------------------------
 
       candidateName: profile.candidateName,
-
       dateOfBirth: profile.dateOfBirth,
 
-      // -------------------------------------------------------
       // EDITABLE FIELDS
-      // -------------------------------------------------------
 
       mobile: profile.mobile,
       email: profile.email,
@@ -625,33 +884,24 @@ export const getProfileManagerById = async (req, res) => {
       aadharCardNumber: profile.aadharCardNumber,
       isActive: profile.isActive,
 
-      // -------------------------------------------------------
       // DETAILS
-      // -------------------------------------------------------
 
       educationDetails,
       employmentDetails,
 
-      // -------------------------------------------------------
       // VERIFICATION STATUS
-      // -------------------------------------------------------
 
       isCandidateInfoLocked,
+      hasEducationVerification:
+        !!educationProfileVerificationExists,
+      hasEmploymentVerification:
+        !!employmentProfileVerificationExists,
 
-      // Optional separate status
-      hasEducationVerification: !!educationProfileVerificationExists,
-
-      hasEmploymentVerification: !!employmentProfileVerificationExists,
-
-      // -------------------------------------------------------
       // DATES
-      // -------------------------------------------------------
 
       createdDate: profile.createdDate,
       updatedDate: profile.updatedDate,
     };
-
-    // SUCCESS RESPONSE
 
     return res.status(200).json({
       success: true,
@@ -667,6 +917,7 @@ export const getProfileManagerById = async (req, res) => {
     });
   }
 };
+
 
 // export const updateProfileManager = async (req, res) => {
 //   try {

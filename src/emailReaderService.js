@@ -308,9 +308,9 @@ const readEmails = async () => {
           );
 
         if (!verification) {
-          console.log(
-            `Verification record not found: ${verificationId}`
-          );
+          // console.log(
+          //   `Verification record not found: ${verificationId}`
+          // );
 
           continue;
         }

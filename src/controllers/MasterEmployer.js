@@ -3,6 +3,7 @@ import Subscription from "../models/SubscriptionPlanSchema.js";
 import mongoose from "mongoose";
 import User from "../models/User.js";
 import nodemailer from "nodemailer";
+import CreditTransaction from "../models/creditTransactionSchema.js";
 
 export const createMasterEmployer = async (req, res) => {
   try {
@@ -16,7 +17,6 @@ export const createMasterEmployer = async (req, res) => {
       city,
       state,
       country,
-      subscriptionId,
       // password,
     } = req.body;
 
@@ -71,26 +71,6 @@ export const createMasterEmployer = async (req, res) => {
         success: false,
         message: "State is required",
       });
-    }
-
-    let subscription = null;
-
-    if (subscriptionId && subscriptionId.trim() !== "") {
-      subscription = await Subscription.findById(subscriptionId);
-
-      if (!subscription) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid Subscription",
-        });
-      }
-
-      if (!subscription.isActive) {
-        return res.status(400).json({
-          success: false,
-          message: "Subscription is not active",
-        });
-      }
     }
 
     const finalGST = gst?.trim() ? gst.toUpperCase().trim() : undefined;
@@ -192,11 +172,7 @@ export const createMasterEmployer = async (req, res) => {
       city: city.trim(),
       state: state.trim(),
       country: country ? country.trim() : "India",
-      subscriptionId:
-        subscriptionId && subscriptionId.trim() !== ""
-          ? subscriptionId
-          : undefined,
-      credits: subscription ? subscription.credits : undefined,
+      credits: 0,
       createdBy,
     });
 
@@ -236,14 +212,14 @@ export const createMasterEmployer = async (req, res) => {
     // RESPONSE
     return res.status(201).json({
       success: true,
-      message: "Master Employer created successfully",
+      message: "Employer created successfully",
 
       data: {
         masterEmployer,
       },
     });
   } catch (error) {
-    console.error("Create Master Employer Error =>", error);
+    console.error("Create Employer Error =>", error);
 
     // DUPLICATE KEY ERROR
     if (error.code === 11000) {
@@ -282,11 +258,9 @@ export const getMasterEmployers = async (req, res) => {
       });
     }
 
-    const employerList = await MasterEmployer.find({ createdBy })
-      .sort({
-        createdDate: -1,
-      })
-      .populate("subscriptionId", "name price duration");
+    const employerList = await MasterEmployer.find({ createdBy }).sort({
+      createdDate: -1,
+    });
 
     const data = employerList.map((employer) => ({
       id: employer._id,
@@ -303,7 +277,6 @@ export const getMasterEmployers = async (req, res) => {
       city: employer.city,
       state: employer.state,
       country: employer.country,
-      subscriptionId: employer.subscriptionId,
       credits: employer.credits,
       isActive: employer.isActive,
       createdDate: employer.createdDate,
@@ -349,7 +322,7 @@ export const getMasterEmployerById = async (req, res) => {
     const employer = await MasterEmployer.findOne({
       _id: id,
       createdBy,
-    }).populate("subscriptionId", "name price duration");
+    });
 
     if (!employer) {
       return res.status(404).json({
@@ -378,7 +351,6 @@ export const getMasterEmployerById = async (req, res) => {
       state: employer.state,
       country: employer.country,
 
-      subscriptionId: employer.subscriptionId,
       credits: employer.credits,
 
       isActive: employer.isActive,
@@ -416,7 +388,6 @@ export const updateMasterEmployer = async (req, res) => {
       city,
       state,
       country,
-      subscriptionId,
       isActive,
     } = req.body;
 
@@ -612,35 +583,6 @@ export const updateMasterEmployer = async (req, res) => {
       employer.country = country.trim();
     }
 
-    // Subscription Update
-    if (subscriptionId !== undefined) {
-      // Remove Subscription
-      if (subscriptionId === "") {
-        employer.subscriptionId = undefined;
-        employer.credits = undefined;
-      } else {
-        const subscription = await Subscription.findById(subscriptionId);
-
-        if (!subscription) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid Subscription",
-          });
-        }
-
-        if (!subscription.isActive) {
-          return res.status(400).json({
-            success: false,
-            message: "Subscription is not active",
-          });
-        }
-
-        employer.subscriptionId = subscription._id;
-        // credits automatic
-        employer.credits = subscription.credits;
-      }
-    }
-
     // Active Status Update
     if (isActive !== undefined) {
       employer.isActive = isActive === true || isActive === "true";
@@ -681,329 +623,6 @@ export const updateMasterEmployer = async (req, res) => {
   }
 };
 
-// export const updateMasterEmployerStatus = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { isActive } = req.body;
-
-//     if (!mongoose.Types.ObjectId.isValid(id)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid Employer Id",
-//       });
-//     }
-
-//     // VALIDATE STATUS
-
-//     let activeStatus;
-
-//     if (typeof isActive === "boolean") {
-//       activeStatus = isActive;
-//     } else if (typeof isActive === "string") {
-//       if (isActive.toLowerCase() === "true") {
-//         activeStatus = true;
-//       } else if (isActive.toLowerCase() === "false") {
-//         activeStatus = false;
-//       } else {
-//         return res.status(400).json({
-//           success: false,
-//           message: "isActive must be true or false",
-//         });
-//       }
-//     } else {
-//       return res.status(400).json({
-//         success: false,
-//         message: "isActive must be true or false",
-//       });
-//     }
-
-//     // CURRENT LOGGED-IN USER
-
-//     const updatedBy = req.user?.id || null;
-
-//     if (!updatedBy) {
-//       return res.status(401).json({
-//         success: false,
-//         message: "User authentication required",
-//       });
-//     }
-
-//     // FIND MASTER EMPLOYER
-
-//     const employer = await MasterEmployer.findById(id);
-
-//     if (!employer) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Master Employer not found",
-//       });
-//     }
-
-//     // UPDATE MASTER EMPLOYER STATUS
-
-//     employer.isActive = activeStatus;
-//     employer.updatedBy = updatedBy;
-//     employer.updatedDate = new Date();
-//     const updatedEmployer = await employer.save();
-
-//     // UPDATE RELATED EMPLOYER USER STATUS
-//     const employerUser = await User.findOne({
-//       refid: employer._id,
-//       refModel: "MasterEmployer",
-//     });
-
-//     let updatedUser = null;
-
-//     if (employerUser) {
-//       employerUser.isActive = activeStatus;
-//       employerUser.updateby = updatedBy;
-//       employerUser.updatedate = new Date();
-//       updatedUser = await employerUser.save();
-//     }
-
-//     // SEND STATUS EMAIL
-
-//     try {
-//       const transporter = nodemailer.createTransport({
-//         host: process.env.SMTP_HOST,
-//         port: Number(process.env.SMTP_PORT),
-//         secure: Number(process.env.SMTP_PORT) === 465,
-//         auth: {
-//           user: process.env.EMAIL_USER,
-//           pass: process.env.EMAIL_PASS,
-//         },
-//       });
-
-//       const statusText = activeStatus ? "Activated" : "Deactivated";
-
-//       const statusColor = activeStatus ? "#28a745" : "#dc3545";
-
-//       await transporter.sendMail({
-//         from: process.env.EMAIL_USER,
-
-//         to: updatedEmployer.email,
-
-//         subject: `Master Employer Account ${statusText}`,
-
-//         html: `
-//           <div
-//             style="
-//               font-family: Arial, sans-serif;
-//               line-height: 1.6;
-//               color: #333;
-//               max-width: 600px;
-//               margin: auto;
-//             "
-//           >
-
-//             <h2>
-//               Hello ${updatedEmployer.name}
-//             </h2>
-
-//             <p>
-//               Your Master Employer account status has
-//               been updated by the administrator.
-//             </p>
-
-//             <table
-//               border="1"
-//               cellpadding="10"
-//               cellspacing="0"
-//               style="
-//                 border-collapse: collapse;
-//                 width: 100%;
-//               "
-//             >
-
-//               <tr>
-//                 <td>
-//                   <strong>Employer Name</strong>
-//                 </td>
-
-//                 <td>
-//                   ${updatedEmployer.name}
-//                 </td>
-//               </tr>
-
-//               <tr>
-//                 <td>
-//                   <strong>Email</strong>
-//                 </td>
-
-//                 <td>
-//                   ${updatedEmployer.email}
-//                 </td>
-//               </tr>
-
-//               <tr>
-//                 <td>
-//                   <strong>Mobile</strong>
-//                 </td>
-
-//                 <td>
-//                   ${updatedEmployer.mobile}
-//                 </td>
-//               </tr>
-
-//               <tr>
-//                 <td>
-//                   <strong>Account Status</strong>
-//                 </td>
-
-//                 <td>
-//                   <strong style="color: ${statusColor};">
-//                     ${statusText}
-//                   </strong>
-//                 </td>
-//               </tr>
-
-//             </table>
-
-//             <br />
-
-//             ${
-//               activeStatus
-//                 ? `
-//                   <p>
-//                     Your Master Employer account has been
-//                     <strong style="color: #28a745;">
-//                       activated
-//                     </strong>
-//                     successfully.
-//                   </p>
-
-//                   <p>
-//                     You can now log in and use your
-//                     Master Employer account.
-//                   </p>
-//                 `
-//                 : `
-//                   <p>
-//                     Your Master Employer account has been
-//                     <strong style="color: #dc3545;">
-//                       deactivated
-//                     </strong>
-//                     by the administrator.
-//                   </p>
-
-//                   <p>
-//                     You will not be able to access your
-//                     Master Employer account until it is
-//                     activated again.
-//                   </p>
-//                 `
-//             }
-
-//             <br />
-
-//             <p>
-//               Regards,<br />
-//               Admin Team
-//             </p>
-
-//           </div>
-//         `,
-//       });
-
-//       console.log(
-//         `Master Employer status email sent successfully to ${updatedEmployer.email}`,
-//       );
-//     } catch (emailError) {
-//       // Email fail hone par status update fail nahi hoga
-//       console.log("Master Employer status email sending failed:", emailError);
-//     }
-
-//     // SUCCESS RESPONSE
-
-//     return res.status(200).json({
-//       success: true,
-
-//       message: activeStatus
-//         ? "Master Employer and User activated successfully"
-//         : "Master Employer and User deactivated successfully",
-
-//       data: {
-//         masterEmployer: {
-//           _id: updatedEmployer._id,
-//           name: updatedEmployer.name,
-//           email: updatedEmployer.email,
-//           mobile: updatedEmployer.mobile,
-//           gst: updatedEmployer.gst,
-//           pan: updatedEmployer.pan,
-//           address: updatedEmployer.address,
-//           city: updatedEmployer.city,
-//           state: updatedEmployer.state,
-//           country: updatedEmployer.country,
-//           subscriptionId: updatedEmployer.subscriptionId,
-//           credits: updatedEmployer.credits,
-//           isActive: updatedEmployer.isActive,
-//           createdBy: updatedEmployer.createdBy,
-//           updatedBy: updatedEmployer.updatedBy,
-//           createdDate: updatedEmployer.createdDate,
-//           updatedDate: updatedEmployer.updatedDate,
-//         },
-
-//         user: updatedUser
-//           ? {
-//               _id: updatedUser._id,
-//               name: updatedUser.name,
-//               email: updatedUser.email,
-//               mobileNo: updatedUser.mobileNo,
-//               UserRole: updatedUser.UserRole,
-//               refid: updatedUser.refid,
-//               refModel: updatedUser.refModel,
-//               isActive: updatedUser.isActive,
-//               createdate: updatedUser.createdate,
-//               createby: updatedUser.createby,
-//               updateby: updatedUser.updateby,
-//               updatedate: updatedUser.updatedate,
-//             }
-//           : null,
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Update Master Employer Status Error =>", error);
-
-//     // MONGOOSE VALIDATION ERROR
-
-//     if (error.name === "ValidationError") {
-//       const messages = Object.values(error.errors).map((err) => err.message);
-
-//       return res.status(400).json({
-//         success: false,
-//         message: messages.join(", "),
-//       });
-//     }
-
-//     // CAST ERROR
-
-//     if (error.name === "CastError") {
-//       return res.status(400).json({
-//         success: false,
-//         message: `Invalid value for ${error.path}`,
-//       });
-//     }
-
-//     // DUPLICATE KEY ERROR
-
-//     if (error.code === 11000) {
-//       const duplicateField = Object.keys(error.keyPattern || {})[0];
-
-//       return res.status(400).json({
-//         success: false,
-//         message: `${duplicateField} already exists`,
-//       });
-//     }
-
-//     // SERVER ERROR
-
-//     return res.status(500).json({
-//       success: false,
-//       message: error.message || "Something went wrong",
-//     });
-//   }
-// };
-
 export const updateMasterEmployerStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1039,7 +658,7 @@ export const updateMasterEmployerStatus = async (req, res) => {
     if (!employer) {
       return res.status(404).json({
         success: false,
-        message: "Master Employer not found",
+        message: "Employer not found",
       });
     }
 
@@ -1067,8 +686,8 @@ export const updateMasterEmployerStatus = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: activeStatus
-        ? "Master Employer activated successfully"
-        : "Master Employer deactivated successfully",
+        ? "Employer activated successfully"
+        : "Employer deactivated successfully",
 
       data: {
         employerId: employer._id,
@@ -1087,7 +706,7 @@ export const updateMasterEmployerStatus = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Update Master Employer Status Error:", error);
+    console.error("Update Employer Status Error:", error);
 
     // CAST ERROR
     if (error.name === "CastError") {
@@ -1099,9 +718,7 @@ export const updateMasterEmployerStatus = async (req, res) => {
 
     // VALIDATION ERROR
     if (error.name === "ValidationError") {
-      const messages = Object.values(error.errors).map(
-        (err) => err.message
-      );
+      const messages = Object.values(error.errors).map((err) => err.message);
 
       return res.status(400).json({
         success: false,
@@ -1125,7 +742,7 @@ export const createMasterEmployerUser = async (req, res) => {
     if (!masterEmployerId) {
       return res.status(400).json({
         success: false,
-        message: "Master Employer Id is required",
+        message: "Employer Id is required",
       });
     }
 
@@ -1135,7 +752,7 @@ export const createMasterEmployerUser = async (req, res) => {
     if (!masterEmployer) {
       return res.status(404).json({
         success: false,
-        message: "Master Employer not found",
+        message: "Employer not found",
       });
     }
 
@@ -1166,7 +783,7 @@ export const createMasterEmployerUser = async (req, res) => {
       email: masterEmployer.email,
       password: hashedPassword,
       mobileNo: masterEmployer.mobile,
-      UserRole: "Master Employer",
+      UserRole: "Employer",
       // Master Employer id save hogi
       refid: masterEmployer._id,
       createby: req.user?.id || null,
@@ -1186,13 +803,13 @@ export const createMasterEmployerUser = async (req, res) => {
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: masterEmployer.email,
-      subject: "Master Employer Account Created Successfully",
+      subject: "Employer Account Created Successfully",
       html: `
 
       <h2>Hello ${masterEmployer.name}</h2>
 
 
-      <p>Your Master Employer account has been created successfully.</p>
+      <p>Your Employer account has been created successfully.</p>
 
 
       <table border="1" cellpadding="8">
@@ -1219,11 +836,11 @@ export const createMasterEmployerUser = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Master Employer user created successfully",
+      message: "Employer user created successfully",
       data: user,
     });
   } catch (error) {
-    console.log("Create Master Employer User Error =>", error);
+    console.log("Create Employer User Error =>", error);
 
     if (error.code === 11000) {
       return res.status(400).json({
@@ -1243,7 +860,6 @@ export const getMasterEmployersAll = async (req, res) => {
   try {
     const employerList = await MasterEmployer.find()
       .sort({ createdDate: -1 })
-      .populate("subscriptionId", "name price duration credits")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
 
@@ -1268,8 +884,6 @@ export const getMasterEmployersAll = async (req, res) => {
       state: employer.state,
       country: employer.country || "India",
 
-      // Subscription
-      subscriptionId: employer.subscriptionId || null,
       credits: employer.credits ?? null,
 
       // Status
@@ -1289,7 +903,7 @@ export const getMasterEmployersAll = async (req, res) => {
       data,
     });
   } catch (error) {
-    console.error("Get Master Employers Error =>", error);
+    console.error("Get Employers Error =>", error);
 
     return res.status(500).json({
       success: false,
@@ -1312,7 +926,6 @@ export const getMasterEmployerByIdOne = async (req, res) => {
 
     // Get Employer by ID
     const employer = await MasterEmployer.findById(id)
-      .populate("subscriptionId", "name price duration credits")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
 
@@ -1347,8 +960,6 @@ export const getMasterEmployerByIdOne = async (req, res) => {
       state: employer.state,
       country: employer.country || "India",
 
-      // Subscription
-      subscriptionId: employer.subscriptionId || null,
       credits: employer.credits ?? null,
 
       // Status
@@ -1376,300 +987,6 @@ export const getMasterEmployerByIdOne = async (req, res) => {
     });
   }
 };
-
-// export const updateMasterEmployerApproval = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-
-//     // VALIDATE ID
-//     if (!mongoose.Types.ObjectId.isValid(id)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid Employer Id",
-//       });
-//     }
-
-//     // LOGGED-IN ADMIN
-//     const updatedBy = req.user?.id || req.user?._id || null;
-
-//     if (!updatedBy) {
-//       return res.status(401).json({
-//         success: false,
-//         message: "User authentication required",
-//       });
-//     }
-
-//     // FIND MASTER EMPLOYER
-//     const employer = await MasterEmployer.findById(id);
-
-//     if (!employer) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Master Employer not found",
-//       });
-//     }
-
-//     // ALREADY APPROVED CHECK
-//     if (employer.isApproved === true) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Master Employer is already approved",
-//       });
-//     }
-
-//     // APPROVE MASTER EMPLOYER
-
-//     employer.isApproved = true;
-//     employer.updatedBy = updatedBy;
-//     employer.updatedDate = new Date();
-
-//     const updatedEmployer = await employer.save();
-
-//     // FIND RELATED USER
-
-//     let employerUser = await User.findOne({
-//       refid: employer._id,
-//       refModel: "MasterEmployer",
-//     });
-
-//     let userCreated = false;
-
-//     // CREATE / ACTIVATE USER
-
-//     if (employerUser) {
-//       // Existing user ko active karo
-
-//       employerUser.isActive = true;
-//       employerUser.updateby = updatedBy;
-//       employerUser.updatedate = new Date();
-
-//       employerUser = await employerUser.save();
-//     } else {
-//       // New user create karo
-
-//       userCreated = true;
-//       const password = "123";
-//       employerUser = await User.create({
-//         name: employer.name,
-//         email: employer.email.toLowerCase(),
-//         password: password,
-//         mobileNo: employer.mobile,
-//         UserRole: "MasterEmployer",
-//         refid: employer._id,
-//         refModel: "MasterEmployer",
-//         isActive: true,
-//         createby: updatedBy,
-//         createdate: new Date(),
-//       });
-//     }
-
-//     // SEND APPROVAL EMAIL
-
-//     try {
-//       const transporter = nodemailer.createTransport({
-//         host: process.env.SMTP_HOST,
-//         port: Number(process.env.SMTP_PORT),
-//         secure: Number(process.env.SMTP_PORT) === 465,
-//         auth: {
-//           user: process.env.EMAIL_USER,
-//           pass: process.env.EMAIL_PASS,
-//         },
-//       });
-
-//       await transporter.sendMail({
-//         from: process.env.EMAIL_USER,
-//         to: updatedEmployer.email,
-//         subject: "Master Employer Account Approved",
-//         html: `
-//           <div
-//             style="
-//               font-family: Arial, sans-serif;
-//               line-height: 1.6;
-//               color: #333;
-//               max-width: 600px;
-//               margin: auto;
-//             "
-//           >
-//             <h2>
-//               Hello ${updatedEmployer.name},
-//             </h2>
-
-//             <p>
-//               Your Master Employer account has been
-//               <strong style="color: #28a745;">
-//                 approved
-//               </strong>
-//               successfully.
-//             </p>
-
-//             ${
-//               userCreated
-//                 ? `
-//                   <h3>Login Details</h3>
-
-//                   <table
-//                     border="1"
-//                     cellpadding="10"
-//                     cellspacing="0"
-//                     style="
-//                       border-collapse: collapse;
-//                       width: 100%;
-//                     "
-//                   >
-
-//                     <tr>
-//                       <td>
-//                         <strong>Email</strong>
-//                       </td>
-
-//                       <td>
-//                         ${updatedEmployer.email}
-//                       </td>
-//                     </tr>
-
-//                     <tr>
-//                       <td>
-//                         <strong>Password</strong>
-//                       </td>
-
-//                       <td>
-//                         <strong>123</strong>
-//                       </td>
-//                     </tr>
-
-//                     <tr>
-//                       <td>
-//                         <strong>Role</strong>
-//                       </td>
-
-//                       <td>
-//                         Master Employer
-//                       </td>
-//                     </tr>
-
-//                   </table>
-
-//                   <p style="color: #dc3545;">
-//                     Please change your password after
-//                     your first login.
-//                   </p>
-//                 `
-//                 : `
-//                   <p>
-//                     Your existing Master Employer login
-//                     account has been activated.
-//                   </p>
-//                 `
-//             }
-
-//             <br />
-
-//             <p>
-//               Regards,<br />
-//               Admin Team
-//             </p>
-
-//           </div>
-//         `,
-//       });
-
-//       console.log(
-//         `Approval email sent successfully to ${updatedEmployer.email}`,
-//       );
-//     } catch (emailError) {
-//       // Email fail hone par approval fail nahi hoga
-
-//       console.error("Approval email sending failed:", emailError);
-//     }
-
-//     // SUCCESS RESPONSE
-//     return res.status(200).json({
-//       success: true,
-//       message: userCreated
-//         ? "Master Employer approved and User created successfully"
-//         : "Master Employer approved and User activated successfully",
-//       data: {
-//         masterEmployer: {
-//           _id: updatedEmployer._id,
-//           name: updatedEmployer.name,
-//           email: updatedEmployer.email,
-//           mobile: updatedEmployer.mobile,
-//           gst: updatedEmployer.gst,
-//           pan: updatedEmployer.pan,
-//           address: updatedEmployer.address,
-//           city: updatedEmployer.city,
-//           state: updatedEmployer.state,
-//           country: updatedEmployer.country,
-//           subscriptionId: updatedEmployer.subscriptionId,
-//           credits: updatedEmployer.credits,
-//           isApproved: updatedEmployer.isApproved,
-//           isActive: updatedEmployer.isActive,
-//           createdBy: updatedEmployer.createdBy,
-//           updatedBy: updatedEmployer.updatedBy,
-//           createdDate: updatedEmployer.createdDate,
-//           updatedDate: updatedEmployer.updatedDate,
-//         },
-
-//         user: employerUser
-//           ? {
-//               _id: employerUser._id,
-//               name: employerUser.name,
-//               email: employerUser.email,
-//               mobileNo: employerUser.mobileNo,
-//               UserRole: employerUser.UserRole,
-//               refid: employerUser.refid,
-//               refModel: employerUser.refModel,
-//               isActive: employerUser.isActive,
-//               createdate: employerUser.createdate,
-//               createby: employerUser.createby,
-//               updateby: employerUser.updateby,
-//               updatedate: employerUser.updatedate,
-//             }
-//           : null,
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Update Master Employer Approval Error =>", error);
-
-//     // MONGOOSE VALIDATION ERROR
-
-//     if (error.name === "ValidationError") {
-//       const messages = Object.values(error.errors).map((err) => err.message);
-
-//       return res.status(400).json({
-//         success: false,
-//         message: messages.join(", "),
-//       });
-//     }
-
-//     // CAST ERROR
-
-//     if (error.name === "CastError") {
-//       return res.status(400).json({
-//         success: false,
-//         message: `Invalid value for ${error.path}`,
-//       });
-//     }
-
-//     // DUPLICATE KEY ERROR
-
-//     if (error.code === 11000) {
-//       const duplicateField = Object.keys(error.keyPattern || {})[0];
-
-//       return res.status(400).json({
-//         success: false,
-//         message: `${duplicateField} already exists`,
-//       });
-//     }
-
-//     // SERVER ERROR
-
-//     return res.status(500).json({
-//       success: false,
-//       message: error.message || "Something went wrong",
-//     });
-//   }
-// };
 
 export const updateMasterEmployerApproval = async (req, res) => {
   try {
@@ -1699,7 +1016,7 @@ export const updateMasterEmployerApproval = async (req, res) => {
     if (!employer) {
       return res.status(404).json({
         success: false,
-        message: "Master Employer not found",
+        message: "Employer not found",
       });
     }
 
@@ -1707,12 +1024,13 @@ export const updateMasterEmployerApproval = async (req, res) => {
     if (employer.isApproved === true) {
       return res.status(400).json({
         success: false,
-        message: "Master Employer is already approved",
+        message: "Employer is already approved",
       });
     }
 
     // APPROVE MASTER EMPLOYER
     employer.isApproved = true;
+    employer.isActive = true;
     employer.updatedBy = updatedBy;
     employer.updatedDate = new Date();
 
@@ -1747,7 +1065,7 @@ export const updateMasterEmployerApproval = async (req, res) => {
         email: employer.email.toLowerCase(),
         password: password,
         mobileNo: employer.mobile,
-        UserRole: "MasterEmployer",
+        UserRole: "Employer",
         refid: employer._id,
         refModel: "MasterEmployer",
         isActive: true,
@@ -1778,7 +1096,7 @@ export const updateMasterEmployerApproval = async (req, res) => {
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
         to: updatedEmployer.email,
-        subject: "Master Employer Account Approved",
+        subject: "Employer Account Approved",
 
         html: `
           <div
@@ -1796,7 +1114,7 @@ export const updateMasterEmployerApproval = async (req, res) => {
             </h2>
 
             <p>
-              Your Master Employer account has been
+              Your Employer account has been
               <strong style="color: #28a745;">
                 approved
               </strong>
@@ -1844,7 +1162,7 @@ export const updateMasterEmployerApproval = async (req, res) => {
                       </td>
 
                       <td>
-                        Master Employer
+                        Employer
                       </td>
                     </tr>
 
@@ -1857,7 +1175,7 @@ export const updateMasterEmployerApproval = async (req, res) => {
                 `
                 : `
                   <p>
-                    Your existing Master Employer login
+                    Your existing Employer login
                     account has been activated.
                   </p>
                 `
@@ -1890,8 +1208,8 @@ export const updateMasterEmployerApproval = async (req, res) => {
       success: true,
 
       message: userCreated
-        ? "Master Employer approved and User created successfully"
-        : "Master Employer approved and User activated successfully",
+        ? "Employer approved and User created successfully"
+        : "Employer approved and User activated successfully",
 
       data: {
         // ======================================
@@ -1913,7 +1231,6 @@ export const updateMasterEmployerApproval = async (req, res) => {
           city: updatedEmployer.city,
           state: updatedEmployer.state,
           country: updatedEmployer.country,
-          subscriptionId: updatedEmployer.subscriptionId,
           credits: updatedEmployer.credits,
           isApproved: updatedEmployer.isApproved,
           isActive: updatedEmployer.isActive,
@@ -1945,7 +1262,7 @@ export const updateMasterEmployerApproval = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Update Master Employer Approval Error =>", error);
+    console.error("Update Employer Approval Error =>", error);
 
     // ==========================================
     // MONGOOSE VALIDATION ERROR
@@ -2101,23 +1418,6 @@ export const createMasterEmployerPublic = async (req, res) => {
       });
     }
 
-    const subscriptionId = "6a829b40d8d361ecce90f995";
-    const subscription = await Subscription.findById(subscriptionId);
-
-    if (!subscription) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid Subscription",
-      });
-    }
-
-    if (!subscription.isActive) {
-      return res.status(400).json({
-        success: false,
-        message: "Subscription is not active",
-      });
-    }
-
     const employerEmailExists = await MasterEmployer.findOne({
       email: normalizedEmail,
     });
@@ -2185,8 +1485,7 @@ export const createMasterEmployerPublic = async (req, res) => {
       city: normalizedCity,
       state: normalizedState,
       country: normalizedCountry,
-      subscriptionId: subscription._id,
-      credits: subscription.credits,
+      credits: 0,
       isApproved: false,
       isActive: false,
       createdBy: null,
@@ -2208,7 +1507,7 @@ export const createMasterEmployerPublic = async (req, res) => {
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
         to: normalizedEmail,
-        subject: "Master Employer Registration Submitted Successfully",
+        subject: "Employer Registration Submitted Successfully",
         html: `
           <div
             style="
@@ -2221,7 +1520,7 @@ export const createMasterEmployerPublic = async (req, res) => {
               Hello ${normalizedName},
             </h2>
             <p>
-              Your Master Employer registration has been
+              Your Employer registration has been
               submitted successfully.
             </p>
             <p>
@@ -2308,7 +1607,7 @@ export const createMasterEmployerPublic = async (req, res) => {
     return res.status(201).json({
       success: true,
       message:
-        "Master Employer registration submitted successfully and sent to admin for approval.",
+        "Employer registration submitted successfully and sent to admin for approval.",
       data: {
         masterEmployer: {
           _id: masterEmployer._id,
@@ -2324,7 +1623,6 @@ export const createMasterEmployerPublic = async (req, res) => {
           city: masterEmployer.city,
           state: masterEmployer.state,
           country: masterEmployer.country,
-          subscriptionId: masterEmployer.subscriptionId,
           credits: masterEmployer.credits,
           isApproved: masterEmployer.isApproved,
           isActive: masterEmployer.isActive,

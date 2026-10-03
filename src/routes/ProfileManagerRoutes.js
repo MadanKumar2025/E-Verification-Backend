@@ -6,6 +6,7 @@ import {
   getProfileManagerById,
   updateProfileManager,
   updateProfileManagerStatus,
+  getProfileList,
 } from "../controllers/ProfileManagerController.js";
 
 import authMiddleware from "../middleware/authMiddleware.js";
@@ -21,6 +22,8 @@ router.post(
   createProfileManager,
 );
 router.get("/", authMiddleware, getProfileManagers);
+router.get("/list", authMiddleware, getProfileList);
+
 router.get("/:id", authMiddleware, getProfileManagerById);
 router.put(
   "/update/:id",

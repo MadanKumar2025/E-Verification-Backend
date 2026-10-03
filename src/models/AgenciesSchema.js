@@ -91,10 +91,6 @@ const agencySchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  // subscriptionId: {
-  //   type: String,
-  //   required: true,
-  // },
 
   panCardPDF: {
     type: String,
@@ -110,12 +106,6 @@ const agencySchema = new mongoose.Schema({
   companyRegistrationPDF: {
     type: String,
     trim: true,
-  },
-
-  subscriptionId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Subscription",
-    required: true,
   },
 
   isActive: {
